@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme Variables - RGB Format for Tailwind Opacity Support */
+:root.dark {
+  --color-background: 10 10 15;
+  /* #0a0a0f */
+  --color-surface: 22 22 31;
+  /* #16161f */
+  --color-primary: 99 102 241;
+  /* #6366f1 - Indigo 500 */
+  --color-secondary: 168 85 247;
+  /* #a855f7 - Purple 500 */
+  --color-text: 255 255 255;
+  /* #ffffff */
+  --color-text-secondary: 156 163 175;
+  /* #9ca3af */
+  --color-border: 255 255 255;
+  /* Opacity handled in config */
+  --color-hover: 255 255 255;
+  /* Opacity handled in config */
+}
+
+:root.light {
+  --color-background: 255 255 255;
+  /* #ffffff */
+  --color-surface: 249 250 251;
+  /* #f9fafb */
+  --color-primary: 79 70 229;
+  /* #4f46e5 - Indigo 600 */
+  --color-secondary: 147 51 234;
+  /* #9333ea - Purple 600 */
+  --color-text: 17 24 39;
+  /* #111827 */
+  --color-text-secondary: 107 114 128;
+  /* #6b7280 */
+  --color-border: 0 0 0;
+  /* Opacity handled in config */
+  --color-hover: 0 0 0;
+  /* Opacity handled in config */
+}
+
+/* Smooth theme transition */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+::selection {
+  @apply bg-primary/30 text-white;
+}
+
+/* Leaflet Map - Theme Aware */
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background-color: rgb(var(--color-surface)) !important;
+  color: rgb(var(--color-text)) !important;
+  border: 1px solid rgba(var(--color-border), 0.1) !important;
+  @apply backdrop-blur-md shadow-xl rounded-xl !important;
+}
+
+.leaflet-popup-content {
+  @apply m-4 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: rgb(var(--color-text-secondary)) !important;
+}
+
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: rgb(var(--color-text)) !important;
+}
+
+/* Custom Scrollbar - Minimalist */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+  /* gray-400 with opacity */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}

@@ -1,0 +1,194 @@
+import { useState } from 'react';
+import { Plus, MessageSquare, Menu, MapPin, X, Grid3x3, Map as MapIcon } from 'lucide-react';
+import LiveMap from './components/LiveMap';
+import FeedView from './components/FeedView';
+import PostItemForm from './components/PostItemForm';
+import ChatInterface from './components/ChatInterface';
+import { motion, AnimatePresence } from 'framer-motion';
+
+type ViewMode = 'feed' | 'map';
+
+function App() {
+  const [viewMode, setViewMode] = useState<ViewMode>('feed');
+  const [isPostFormOpen, setIsPostFormOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <div className="h-screen w-screen bg-background text-text overflow-hidden relative selection:bg-primary/30">
+
+      {/* Content Area */}
+      <div className="absolute inset-0 z-0 pt-20">
+        <AnimatePresence mode="wait">
+          {viewMode === 'feed' ? (
+            <motion.div
+              key="feed"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="h-full overflow-y-auto"
+            >
+              <FeedView />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="map"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="h-full"
+            >
+              <LiveMap />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Floating Navbar (Glassmorphism) */}
+      <motion.nav
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="absolute top-4 left-1/2 -translate-x-1/2 w-[95%] md:w-[90%] max-w-6xl z-50"
+      >
+        <div className="bg-surface/80 backdrop-blur-xl border border-white/10 rounded-full px-4 md:px-6 py-3 shadow-2xl flex justify-between items-center">
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <div className="bg-gradient-to-tr from-primary to-secondary p-2 rounded-lg shadow-lg shadow-primary/30">
+              <MapPin className="text-white w-4 h-4 md:w-5 md:h-5" />
+            </div>
+            <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+              KhojSetu
+            </h1>
+          </div>
+
+          {/* View Toggle (Desktop) */}
+          <div className="hidden md:flex items-center gap-2 bg-black/40 p-1 rounded-full">
+            <button
+              onClick={() => setViewMode('feed')}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${viewMode === 'feed' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              <Grid3x3 className="w-4 h-4" />
+              Feed
+            </button>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition flex items-center gap-2 ${viewMode === 'map' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                }`}
+            >
+              <MapIcon className="w-4 h-4" />
+              Map
+            </button>
+          </div>
+
+          {/* Desktop Nav Actions */}
+          <div className="hidden md:flex items-center gap-3">
+            <button
+              onClick={() => setIsChatOpen(true)}
+              className="p-2 hover:bg-white/10 rounded-full transition-colors relative group"
+              aria-label="Open messages"
+            >
+              <MessageSquare className="w-5 h-5 text-gray-300 group-hover:text-white transition" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-surface animate-pulse"></span>
+            </button>
+          </div>
+
+          {/* Mobile Menu Toggle */}
+          <button
+            className="md:hidden p-2 text-gray-300 hover:bg-white/10 rounded-full transition"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+      </motion.nav>
+
+      {/* Floating Action Button (FAB) for Quick Post */}
+      <motion.button
+        onClick={() => setIsPostFormOpen(true)}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        className="fixed bottom-6 right-6 z-50 p-4 bg-gradient-to-r from-primary to-secondary rounded-full text-white shadow-2xl shadow-primary/50 hover:shadow-primary/70 transition-all"
+      >
+        <Plus className="w-6 h-6" />
+      </motion.button>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/90 backdrop-blur-xl border-t border-white/10 px-4 py-3">
+        <div className="flex justify-around items-center">
+          <button
+            onClick={() => setViewMode('feed')}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition ${viewMode === 'feed' ? 'text-primary bg-primary/10' : 'text-gray-400'
+              }`}
+          >
+            <Grid3x3 className="w-5 h-5" />
+            <span className="text-xs font-medium">Feed</span>
+          </button>
+          <button
+            onClick={() => setViewMode('map')}
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition ${viewMode === 'map' ? 'text-primary bg-primary/10' : 'text-gray-400'
+              }`}
+          >
+            <MapIcon className="w-5 h-5" />
+            <span className="text-xs font-medium">Map</span>
+          </button>
+          <button
+            onClick={() => setIsChatOpen(true)}
+            className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition text-gray-400 relative"
+          >
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-xs font-medium">Messages</span>
+            <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="absolute top-20 right-4 z-50 bg-surface/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 flex flex-col gap-2 shadow-2xl md:hidden w-64 origin-top-right"
+          >
+            <button
+              onClick={() => { setIsPostFormOpen(true); setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 w-full p-3 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl text-primary hover:from-primary/30 hover:to-secondary/30 transition"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="font-medium">Post Item</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modals & Overlays */}
+      <AnimatePresence mode="wait">
+        {isPostFormOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setIsPostFormOpen(false)}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <PostItemForm onClose={() => setIsPostFormOpen(false)} />
+            </div>
+          </motion.div>
+        )}
+        {isChatOpen && (
+          <ChatInterface onClose={() => setIsChatOpen(false)} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export default App;
