@@ -112,7 +112,7 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
         try {
             const convs = await ChatService.getConversations(currentUser.id);
             // Preserve the active conversation if it was a temporary new one
-            setConversations(prev => {
+            setConversations(() => {
                 // Merge real convs with temps (deduplicate if temp became real)
                 // For simplicity, we just use real convs, but if we are in a temp chat, keep it?
                 // Actually, if a message was received for a temp chat, it would now be a real chat in 'convs'.
@@ -172,12 +172,14 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
             const referenceMsg = `[REF_CARD]${JSON.stringify(refData)}`;
 
             try {
-                await ChatService.sendMessage(
-                    currentUser,
-                    contact.id,
-                    contact.postId,
-                    referenceMsg
-                );
+                if (currentUser) {
+                    await ChatService.sendMessage(
+                        currentUser,
+                        contact.id,
+                        contact.postId,
+                        referenceMsg
+                    );
+                }
                 await loadConversations();
             } catch (err) {
                 console.error("Failed to send auto-message", err);
@@ -245,7 +247,7 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                         console.error('Failed to send location:', error);
                     }
                 },
-                (error) => {
+                () => {
                     alert('Could not access your location.');
                 }
             );

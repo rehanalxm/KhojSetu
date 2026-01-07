@@ -100,7 +100,7 @@ export const PostService = {
         if (error) throw error;
     },
 
-    searchPostsByImage: async (file: File): Promise<Post[]> => {
+    searchPostsByImage: async (_file: File): Promise<Post[]> => {
         // Basic implementation: Just return all posts for now or add a text search
         // Supabase Vector is needed for real image search, for now we can filter by type/category if needed
         return PostService.getAllPosts();

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, SlidersHorizontal, X, MapPin, Grid3x3, Map as MapIcon, MessageSquare, User as UserIcon, Image as ImageIcon, Bell, Sun, Moon } from 'lucide-react';
+import { Search, SlidersHorizontal, MapPin, Grid3x3, Map as MapIcon, MessageSquare, User as UserIcon, Image as ImageIcon, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CATEGORIES } from '../types/categories';
 import type { CategoryId } from '../types/categories';

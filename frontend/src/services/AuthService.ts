@@ -11,7 +11,7 @@ export const AuthService = {
         if (error) throw error;
 
         // Check if profile exists
-        const { data: profile, error: profileFetchError } = await supabase
+        const { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', data.user.id)
@@ -56,7 +56,6 @@ export const AuthService = {
     signup: async (name: string, email: string, password: string, gender: 'male' | 'female'): Promise<User> => {
         // Use different avatar styles based on gender
         const avatarStyle = gender === 'male' ? 'personas' : 'personas';
-        const genderSeed = gender === 'male' ? 'male' : 'female';
         const avatarUrl = `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${name}&faceVariant=${gender === 'male' ? '01,02,04,05,06,07,08' : '03,09,10,11'}`;
 
         const { data, error } = await supabase.auth.signUp({

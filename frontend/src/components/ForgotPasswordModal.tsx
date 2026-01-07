@@ -54,7 +54,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick }: F
         setError('');
         setIsLoading(true);
         try {
-            await AuthService.resetPassword(email, otp, newPassword);
+            await AuthService.resetPassword(newPassword);
             setSuccessMessage('Password reset successfully! Logging you in...');
             setTimeout(() => {
                 onClose();

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { MapPin, Clock, MessageCircle, Trash2, Smartphone, ImageIcon } from 'lucide-react';
-import { CATEGORIES, getTimeAgo } from '../types/categories';
+import { getTimeAgo } from '../types/categories';
 import type { Post } from '../types/categories';
 import type { User } from '../types/auth';
 
