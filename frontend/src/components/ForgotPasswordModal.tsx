@@ -1,23 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, KeyRound, Lock, ArrowRight, Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { X, Mail, Lock, ArrowRight, Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { AuthService } from '../services/AuthService';
 
 interface ForgotPasswordModalProps {
     isOpen: boolean;
     onClose: () => void;
     onLoginClick: () => void;
+    initialStep?: 1 | 2 | 3;
 }
 
-export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick }: ForgotPasswordModalProps) {
-    const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Email, 2: OTP, 3: New Password
+export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick, initialStep = 1 }: ForgotPasswordModalProps) {
+    const [step, setStep] = useState<1 | 2 | 3>(initialStep); // 1: Email, 2: OTP/Link Sent, 3: New Password
     const [email, setEmail] = useState('');
     const [otp, setOtp] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-    const [successMessage, setSuccessMessage] = useState('');
+
+    // Sync step with initialStep when it changes (e.g. when recovery event triggers)
+    useEffect(() => {
+        setStep(initialStep);
+    }, [initialStep]);
 
     const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,9 +32,9 @@ export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick }: F
         try {
             await AuthService.forgotPassword(email);
             setStep(2);
-            setSuccessMessage(`OTP sent to ${email}`);
+            setSuccessMessage(`Reset link sent to ${email}`);
         } catch (err: any) {
-            setError(err.message || 'Failed to send OTP');
+            setError(err.message || 'Failed to send reset link');
         } finally {
             setIsLoading(false);
         }
@@ -130,7 +136,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick }: F
                         {step === 1 && (
                             <form onSubmit={handleSendOtp} className="space-y-4">
                                 <p className="text-gray-400 text-sm mb-4">
-                                    Enter your registered email address properly to receive a 6-digit OTP code.
+                                    Enter your registered email address properly. We will send you a **Password Reset Link**.
                                 </p>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-gray-300">Email Address</label>
@@ -152,7 +158,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick }: F
                                     className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"
                                 >
                                     {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                                        <>Send OTP <ArrowRight className="w-4 h-4" /></>
+                                        <>Send Reset Link <ArrowRight className="w-4 h-4" /></>
                                     )}
                                 </button>
                             </form>
@@ -162,32 +168,15 @@ export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick }: F
                         {step === 2 && (
                             <form onSubmit={handleVerifyOtp} className="space-y-4">
                                 <p className="text-gray-400 text-sm mb-4">
-                                    Enter the 6-digit code sent to <span className="text-primary font-medium">{email}</span>
+                                    A reset link has been sent to <span className="text-primary font-medium">{email}</span>.
+                                    <br /><br />
+                                    Please check your inbox (and spam folder) and click the link to reset your password.
                                 </p>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-gray-300">OTP Code</label>
-                                    <div className="relative">
-                                        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                        <input
-                                            type="text"
-                                            required
-                                            maxLength={6}
-                                            value={otp}
-                                            onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
-                                            className="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-primary/50 transition tracking-widest text-lg font-mono"
-                                            placeholder="000000"
-                                        />
-                                    </div>
+                                <div className="space-y-4 pt-4 border-t border-white/5">
+                                    <p className="text-xs text-muted italic">
+                                        Note: After clicking the link in your email, this window will automatically switch to the new password screen.
+                                    </p>
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"
-                                >
-                                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                                        <>Verify Code <ArrowRight className="w-4 h-4" /></>
-                                    )}
-                                </button>
                                 <button
                                     type="button"
                                     onClick={() => setStep(1)}

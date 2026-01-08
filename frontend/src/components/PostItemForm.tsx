@@ -9,7 +9,7 @@ import { AuthService } from '../services/AuthService';
 
 interface PostItemFormProps {
     onClose: () => void;
-    onShowAlert?: (title: string, message: string, type?: any) => void;
+    onShowAlert?: (title: string, message: string, type?: 'confirm' | 'alert' | 'danger') => void;
 }
 
 export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps) {
@@ -22,10 +22,10 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
     const { location: userLocation, getCurrentLocation } = useGeolocation();
 
     useEffect(() => {
-        if (userLocation.coordinates) {
+        if (userLocation.coordinates && !locationName) {
             setLocationName(`${userLocation.coordinates.lat.toFixed(4)}, ${userLocation.coordinates.lng.toFixed(4)}`);
         }
-    }, [userLocation]);
+    }, [userLocation, locationName]);
 
     const handleUseCurrentLocation = () => {
         getCurrentLocation();
@@ -66,7 +66,7 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
             const currentUser = AuthService.getCurrentUser();
 
             if (!currentUser) {
-                onShowAlert?.("Login Required", "Please login to post an item.", "info");
+                onShowAlert?.("Login Required", "Please login to post an item.", "alert");
                 setLoading(false);
                 return;
             }
@@ -92,9 +92,9 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
             onClose();
             // Trigger reload to show new post
             window.location.reload();
-        } catch (error: any) {
-            console.error(error);
-            onShowAlert?.("Post Failed", error.message || 'Unknown error', "danger");
+        } catch (err) {
+            console.error(err);
+            onShowAlert?.("Post Failed", err instanceof Error ? err.message : 'Unknown error', "danger");
             setLoading(false);
         }
     };

@@ -17,7 +17,7 @@ export const PostService = {
             return [];
         }
 
-        return data.map((p: any) => ({
+        return (data || []).map((p) => ({
             id: p.id,
             title: p.title,
             description: p.description,
@@ -100,7 +100,7 @@ export const PostService = {
         if (error) throw error;
     },
 
-    searchPostsByImage: async (_file: File): Promise<Post[]> => {
+    searchPostsByImage: async (): Promise<Post[]> => {
         // Basic implementation: Just return all posts for now or add a text search
         // Supabase Vector is needed for real image search, for now we can filter by type/category if needed
         return PostService.getAllPosts();

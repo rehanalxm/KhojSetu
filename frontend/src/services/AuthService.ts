@@ -108,7 +108,7 @@ export const AuthService = {
 
     async forgotPassword(email: string) {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + '/reset-password',
+            redirectTo: window.location.origin,
         });
         if (error) throw error;
     },
@@ -126,6 +126,61 @@ export const AuthService = {
     async resetPassword(password: string) {
         const { error } = await supabase.auth.updateUser({ password });
         if (error) throw error;
+    },
+
+    deleteAccount: async (userId: string): Promise<void> => {
+        console.log("Starting account deletion for:", userId);
+
+        // 1. Delete all messages (Try-Catch each to avoid blocking)
+        try {
+            const { error } = await supabase
+                .from('messages')
+                .delete()
+                .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+            if (error) console.error("Non-critical: Error deleting some messages (might be RLS):", error.message);
+        } catch (e) {
+            console.error("Non-critical: Exception during messages deletion:", e);
+        }
+
+        // 2. Delete all posts
+        try {
+            const { error } = await supabase
+                .from('posts')
+                .delete()
+                .eq('user_id', userId);
+            if (error) console.error("Non-critical: Error deleting posts:", error.message);
+        } catch (e) {
+            console.error("Non-critical: Exception during posts deletion:", e);
+        }
+
+        // 3. Delete the user profile (CRITICAL STEP)
+        console.log("Attempting to delete profile record...");
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', userId);
+
+        if (profileError) {
+            console.error("CRITICAL: Failed to delete profile:", profileError.message);
+            throw new Error(`Profile deletion failed: ${profileError.message}`);
+        }
+
+        // Verify profile is actually gone (to debug trigger)
+        const { data: checkProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', userId)
+            .single();
+
+        if (checkProfile) {
+            console.error("CRITICAL: Profile still exists after delete command!");
+            throw new Error("Profile record persists after deletion. Trigger cannot run.");
+        }
+
+        console.log("Profile deleted successfully. Proceeding to logout.");
+
+        // 4. Logout the user
+        await AuthService.logout();
     },
 
     getCurrentUser: (): User | null => {

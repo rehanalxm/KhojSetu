@@ -37,8 +37,8 @@ export default function AuthModal({ isOpen, onClose, onLogin, onForgotPassword }
             }
             onLogin(user);
             onClose();
-        } catch (err: any) {
-            setError(err.message || 'Authentication failed');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Authentication failed');
         } finally {
             setLoading(false);
         }

@@ -12,6 +12,7 @@ import Toast, { type ToastType } from './components/Toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthService } from './services/AuthService';
 import { PostService } from './services/PostService';
+import { supabase } from './lib/supabase';
 import type { User } from './types/auth';
 import Header from './components/Header';
 import type { CategoryId } from './types/categories';
@@ -64,6 +65,7 @@ function App() {
   const [user, setUser] = useState<User | null>(AuthService.getCurrentUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordStep, setForgotPasswordStep] = useState<1 | 2 | 3>(1);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   // Header State Lifted
@@ -89,6 +91,26 @@ function App() {
       channel.then(c => c.unsubscribe());
     };
   }, [user]);
+
+  // Handle Supabase Password Recovery Redirection
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setForgotPasswordStep(3);
+        setShowForgotPassword(true);
+        setIsAuthModalOpen(false); // Close login modal if open
+
+        // Clear the hash/params from the URL to prevent subsequent loops
+        if (window.location.hash || window.location.search) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   // One-time cleanup of legacy mock data (runs once per browser)
   useEffect(() => {
@@ -145,6 +167,30 @@ function App() {
     setShowProfileMenu(false);
     setUserPostCount(0);
     showToast('Logged out successfully', 'success');
+  };
+
+  const handleDeleteAccount = () => {
+    if (!user) return;
+
+    showConfirm(
+      "Delete Account?",
+      "Warning: This will permanently delete your account, posts, and messages. This action cannot be undone.",
+      async () => {
+        try {
+          await AuthService.deleteAccount(user.id);
+          setUser(null);
+          setShowProfileMenu(false);
+          setUserPostCount(0);
+          showToast('Account deleted successfully', 'success');
+        } catch (error) {
+          console.error("Failed to delete account:", error);
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          showToast(`Delete failed: ${message}`, 'error');
+        }
+      },
+      "danger",
+      "Delete Forever"
+    );
   };
 
   // Alert Helpers
@@ -309,7 +355,7 @@ function App() {
                         showToast("Post deleted successfully", "success");
                         // Refresh map by reloading or using state. For now, reload is safest for the user's current flow.
                         window.location.reload();
-                      } catch (error) {
+                      } catch {
                         showToast("Failed to delete post", "error");
                       }
                     },
@@ -443,6 +489,17 @@ function App() {
                     <span className="block font-semibold text-red-500 group-hover:text-red-600 dark:group-hover:text-red-400">Log Out</span>
                   </div>
                 </button>
+
+                <div className="pt-1 mt-1 border-t border-border/50">
+                  <button
+                    onClick={handleDeleteAccount}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-red-500/5 transition group mt-1"
+                  >
+                    <div className="text-left">
+                      <span className="block text-xs font-semibold text-red-500/60 group-hover:text-red-500 transition">Delete Account</span>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -495,9 +552,14 @@ function App() {
         {/* Forgot Password Modal */}
         <ForgotPasswordModal
           isOpen={showForgotPassword}
-          onClose={() => setShowForgotPassword(false)}
+          initialStep={forgotPasswordStep}
+          onClose={() => {
+            setShowForgotPassword(false);
+            setForgotPasswordStep(1); // Reset step on close
+          }}
           onLoginClick={() => {
             setShowForgotPassword(false);
+            setForgotPasswordStep(1);
             setIsAuthModalOpen(true);
           }}
         />

@@ -7,8 +7,8 @@ import { ChatService, type ChatConversation } from '../services/ChatService';
 interface ChatProps {
     onClose: () => void;
     initialContact?: { id: string; name: string; postId: number; postTitle: string; postType: 'LOST' | 'FOUND'; postImage?: string } | null;
-    onShowConfirm?: (title: string, message: string, onConfirm: () => void, type?: any, confirmText?: string) => void;
-    onShowAlert?: (title: string, message: string, type?: any) => void;
+    onShowConfirm?: (title: string, message: string, onConfirm: () => void, type?: 'confirm' | 'alert' | 'danger', confirmText?: string) => void;
+    onShowAlert?: (title: string, message: string, type?: 'confirm' | 'alert' | 'danger') => void;
 }
 
 export default function ChatInterface({ onClose, initialContact, onShowConfirm, onShowAlert }: ChatProps) {
@@ -336,7 +336,7 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                                         className="absolute -right-2 top-full mt-3 w-52 bg-surface/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[100] p-1.5"
                                     >
                                         <button
-                                            onClick={() => { onShowAlert?.("Coming Soon", "User profiles will be available in a future update!", "info"); setShowMenu(false); }}
+                                            onClick={() => { onShowAlert?.("Coming Soon", "User profiles will be available in a future update!", "alert"); setShowMenu(false); }}
                                             className="w-full text-left px-4 py-3 rounded-xl text-sm text-text hover:bg-white/10 transition flex items-center gap-3 active:scale-95"
                                         >
                                             <div className="p-1.5 bg-blue-500/20 rounded-lg">
@@ -456,7 +456,7 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                                         if (isRefCard) {
                                             try {
                                                 refContent = JSON.parse(msg.text.replace('[REF_CARD]', ''));
-                                            } catch (e) { }
+                                            } catch { }
                                         }
 
                                         return (
