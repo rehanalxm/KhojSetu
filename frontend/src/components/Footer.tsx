@@ -123,7 +123,7 @@ export default function Footer() {
                     </div>
 
                     <a
-                        href="https://rehanalxm.github.io/My-Portfolio/"
+                        href="https://rehanportfolio.vercel.app/"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group relative px-8 py-3 bg-surface hover:bg-surface/80 border border-border rounded-2xl transition-all duration-500 flex items-center gap-3 active:scale-95"
