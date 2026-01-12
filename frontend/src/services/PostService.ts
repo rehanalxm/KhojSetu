@@ -103,8 +103,13 @@ export const PostService = {
             .single();
 
         if (error) {
-            console.error("Post creation failed in Supabase:", error);
-            throw new Error(`Failed to create post: ${error.message}`);
+            console.error("Post creation failed in Supabase:", {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
+            throw new Error(`Failed to create post: ${error.message} (Code: ${error.code})`);
         }
 
         return {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 interface GeolocationState {
     loaded: boolean;
@@ -12,7 +12,7 @@ export const useGeolocation = () => {
         coordinates: null,
     });
 
-    const onSuccess = (location: GeolocationPosition) => {
+    const onSuccess = useCallback((location: GeolocationPosition) => {
         setLocation({
             loaded: true,
             coordinates: {
@@ -20,9 +20,9 @@ export const useGeolocation = () => {
                 lng: location.coords.longitude,
             },
         });
-    };
+    }, []);
 
-    const onError = (error: GeolocationPositionError) => {
+    const onError = useCallback((error: GeolocationPositionError) => {
         setLocation({
             loaded: true,
             coordinates: null,
@@ -31,9 +31,9 @@ export const useGeolocation = () => {
                 message: error.message,
             },
         });
-    };
+    }, []);
 
-    const getCurrentLocation = () => {
+    const getCurrentLocation = useCallback(() => {
         if (!("geolocation" in navigator)) {
             onError({
                 code: 0,
@@ -43,9 +43,9 @@ export const useGeolocation = () => {
         }
 
         navigator.geolocation.getCurrentPosition(onSuccess, onError);
-    };
+    }, [onSuccess, onError]);
 
-    const reverseGeocode = async (lat: number, lng: number) => {
+    const reverseGeocode = useCallback(async (lat: number, lng: number) => {
         try {
             const response = await fetch(
                 `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`
@@ -61,7 +61,7 @@ export const useGeolocation = () => {
             console.error("Reverse geocoding failed:", error);
             return null;
         }
-    };
+    }, []);
 
     return { location, getCurrentLocation, reverseGeocode };
 };
