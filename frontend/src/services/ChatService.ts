@@ -131,9 +131,12 @@ export const ChatService = {
             .single();
 
         if (error) {
-            console.error("Send failed:", error);
-            return null;
+            console.error("Send message failed in Supabase:", error);
+            // Re-throw or return null so UI can show error
+            throw new Error(`Message delivery failed: ${error.message}`);
         }
+
+        console.log("Message sent successfully:", data.id);
 
         return {
             id: data.id.toString(),
@@ -159,7 +162,7 @@ export const ChatService = {
                     table: 'messages',
                     filter: `receiver_id=eq.${userId}`
                 },
-                (payload) => {
+                (payload: any) => {
                     console.log('New message received!', payload);
                     onNewMessage();
                 }

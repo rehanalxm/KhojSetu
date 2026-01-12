@@ -94,7 +94,7 @@ function App() {
 
   // Handle Supabase Password Recovery Redirection
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any) => {
       if (event === 'PASSWORD_RECOVERY') {
         setForgotPasswordStep(3);
         setShowForgotPassword(true);
@@ -214,7 +214,7 @@ function App() {
       title,
       message,
       type,
-      onConfirm: () => setConfirmDialog(prev => ({ ...prev, isOpen: false })),
+      onConfirm: () => setConfirmDialog((prev: any) => ({ ...prev, isOpen: false })),
     });
   };
 
@@ -241,13 +241,13 @@ function App() {
         type={confirmDialog.type}
         confirmText={confirmDialog.confirmText}
         onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onCancel={() => setConfirmDialog((prev: any) => ({ ...prev, isOpen: false }))}
       />
       <Toast
         isVisible={toast.isVisible}
         message={toast.message}
         type={toast.type}
-        onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+        onClose={() => setToast((prev: any) => ({ ...prev, isVisible: false }))}
       />
 
       {/* Unified Header */}
@@ -301,7 +301,7 @@ function App() {
 
                   setChatTarget({
                     id: post.userId,
-                    name: post.createdByName || post.contactInfo || `User ${post.userId}`,
+                    name: post.createdByName || post.contactInfo?.split('@')[0] || `User ${String(post.userId).slice(0, 5)}`,
                     postId: post.id,
                     postTitle: post.title,
                     postType: post.type
@@ -452,7 +452,7 @@ function App() {
             className="fixed inset-0 z-[55] flex flex-col justify-end md:absolute md:top-16 md:right-0 md:left-auto md:w-72 md:h-auto md:justify-start"
             onClick={() => setShowProfileMenu(false)} // Close when clicking outside
           >
-            <div onClick={e => e.stopPropagation()} className="absolute right-0 mt-2 w-64 bg-surface/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl overflow-hidden py-2 z-50">
+            <div onClick={(e: any) => e.stopPropagation()} className="absolute right-0 mt-2 w-64 bg-surface/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl overflow-hidden py-2 z-50">
               <div className="px-4 py-3 border-b border-border text-center">
                 <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 mx-auto mb-2">
                   <img src={user?.avatar} alt={user?.name} className="w-full h-full rounded-full bg-black" />
@@ -516,7 +516,7 @@ function App() {
             className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={() => setIsPostFormOpen(false)}
           >
-            <div onClick={(e) => e.stopPropagation()}>
+            <div onClick={(e: any) => e.stopPropagation()}>
               <PostItemForm
                 onClose={() => setIsPostFormOpen(false)}
                 onShowAlert={showAlert}

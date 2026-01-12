@@ -56,7 +56,6 @@ public class PostController {
     }
 
     @PostMapping("/upload-image")
-    @PostMapping("/upload-image")
     public String uploadImage(@RequestParam("file") MultipartFile file) {
         try {
             // Save file to a local directory (simple implementation for MVP)

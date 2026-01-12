@@ -38,20 +38,20 @@ export const PostService = {
 
     createPost: async (postData: Omit<Post, 'id' | 'timestamp'>): Promise<Post> => {
         // Ensure profile exists before posting (Fix for Foreign Key Constraint Error)
-        const { data: profileCheck } = await supabase
+        // Using upsert ensures that if the profile doesn't exist, it's created,
+        // and if it does exist, it's updated or left alone depending on RLS.
+        const { error: profileError } = await supabase
             .from('profiles')
-            .select('id')
-            .eq('id', postData.userId)
-            .single();
-
-        if (!profileCheck) {
-            console.log("Supabase Fix: Profile missing for user, creating it now...");
-            await supabase.from('profiles').insert({
+            .upsert({
                 id: postData.userId,
-                name: postData.createdByName,
-                email: postData.contactInfo, // Best guess fallback
-                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${postData.createdByName}`
-            });
+                name: postData.createdByName || 'Anonymous',
+                email: postData.contactInfo || 'No Email',
+                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${postData.userId}`
+            }, { onConflict: 'id' });
+
+        if (profileError) {
+            console.error("Profile sync failed (non-blocking):", profileError);
+            // We continue anyway, but the next step might fail if RLS prevents posting without profile
         }
 
         const { data, error } = await supabase
@@ -71,7 +71,10 @@ export const PostService = {
             .select()
             .single();
 
-        if (error) throw error;
+        if (error) {
+            console.error("Post creation failed in Supabase:", error);
+            throw new Error(`Failed to create post: ${error.message}`);
+        }
 
         return {
             id: data.id,
