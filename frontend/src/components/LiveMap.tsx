@@ -58,9 +58,10 @@ interface LiveMapProps {
     currentUser: User | null;
     onContact?: (post: Post) => void;
     onDelete?: (postId: number) => void;
+    onOpenDetail?: (post: Post) => void;
 }
 
-export default function LiveMap({ currentUser, onContact, onDelete }: LiveMapProps) {
+export default function LiveMap({ currentUser, onContact, onDelete, onOpenDetail }: LiveMapProps) {
     const { theme } = useTheme();
     const [posts, setPosts] = useState<Post[]>([]);
 
@@ -114,6 +115,12 @@ export default function LiveMap({ currentUser, onContact, onDelete }: LiveMapPro
                                     <h3 className="font-bold text-gray-900 dark:text-gray-100">{post.title}</h3>
                                     <p className="text-xs text-muted mb-2 truncate">{post.description}</p>
                                     <div className="flex gap-2">
+                                        <button
+                                            onClick={() => onOpenDetail?.(post)}
+                                            className="flex-1 px-3 py-1.5 bg-surface-lighter dark:bg-white/10 text-text text-xs font-bold rounded-lg flex items-center justify-center gap-1 hover:bg-primary hover:text-white transition"
+                                        >
+                                            Details
+                                        </button>
                                         {!isOwner ? (
                                             <button
                                                 onClick={() => onContact?.(post)}

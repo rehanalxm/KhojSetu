@@ -1,8 +1,19 @@
-import { supabase } from '../lib/supabase';
+import { supabase, USE_MOCK } from '../lib/supabase';
 import type { Post } from '../types/categories';
+
+const STORAGE_KEY = 'khojsetu_mock_posts';
 
 export const PostService = {
     getAllPosts: async (): Promise<Post[]> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Fetching all posts...");
+            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            return posts.map((p: any) => ({
+                ...p,
+                timestamp: new Date(p.timestamp)
+            }));
+        }
+
         // Fetch posts and join with profiles to get user name
         const { data, error } = await supabase
             .from('posts')
@@ -24,6 +35,7 @@ export const PostService = {
             type: p.type,
             category: p.category,
             imageUrl: p.image_url,
+            imageUrls: p.image_urls || [p.image_url].filter(Boolean),
             location: {
                 lat: p.location_lat,
                 lng: p.location_lng,
@@ -32,11 +44,26 @@ export const PostService = {
             timestamp: new Date(p.created_at),
             userId: p.user_id,
             contactInfo: p.contact_info,
-            createdByName: p.profiles?.name // Mapped from joined table
+            createdByName: p.profiles?.name
         }));
     },
 
     createPost: async (postData: Omit<Post, 'id' | 'timestamp'>): Promise<Post> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Creating post...", postData.title);
+            const newPost: Post = {
+                ...postData,
+                id: Math.floor(Math.random() * 1000000),
+                timestamp: new Date()
+            };
+
+            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            posts.unshift(newPost);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+
+            return newPost;
+        }
+
         // Ensure profile exists before posting (Fix for Foreign Key Constraint Error)
         // Using upsert ensures that if the profile doesn't exist, it's created,
         // and if it does exist, it's updated or left alone depending on RLS.
@@ -51,7 +78,6 @@ export const PostService = {
 
         if (profileError) {
             console.error("Profile sync failed (non-blocking):", profileError);
-            // We continue anyway, but the next step might fail if RLS prevents posting without profile
         }
 
         const { data, error } = await supabase
@@ -62,7 +88,8 @@ export const PostService = {
                 description: postData.description,
                 type: postData.type,
                 category: postData.category,
-                image_url: postData.imageUrl,
+                image_url: postData.imageUrl || (postData.imageUrls?.[0] || ''),
+                image_urls: postData.imageUrls || [postData.imageUrl].filter(Boolean),
                 contact_info: postData.contactInfo,
                 location_lat: postData.location.lat,
                 location_lng: postData.location.lng,
@@ -83,6 +110,7 @@ export const PostService = {
             type: data.type,
             category: data.category,
             imageUrl: data.image_url,
+            imageUrls: data.image_urls || [data.image_url].filter(Boolean),
             location: {
                 lat: data.location_lat,
                 lng: data.location_lng,
@@ -95,6 +123,14 @@ export const PostService = {
     },
 
     deletePost: async (postId: number): Promise<void> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Deleting post...", postId);
+            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const filtered = posts.filter((p: any) => p.id !== postId);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+            return;
+        }
+
         const { error } = await supabase
             .from('posts')
             .delete()

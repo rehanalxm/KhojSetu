@@ -16,7 +16,7 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
     const [loading, setLoading] = useState(false);
     const [type, setType] = useState<'LOST' | 'FOUND'>('LOST');
     const [category, setCategory] = useState<CategoryId>('OTHER');
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [step, setStep] = useState<1 | 2>(1); // Two-step form
     const [locationName, setLocationName] = useState('');
     const { location: userLocation, getCurrentLocation } = useGeolocation();
@@ -33,14 +33,23 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
+        const files = Array.from(e.target.files || []);
+        if (files.length > 0) {
+            const remaining = 3 - imagePreviews.length;
+            const toAdd = files.slice(0, remaining);
+
+            toAdd.forEach(file => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImagePreviews(prev => [...prev, reader.result as string].slice(0, 3));
+                };
+                reader.readAsDataURL(file);
+            });
         }
+    };
+
+    const removeImage = (index: number) => {
+        setImagePreviews(prev => prev.filter((_, i) => i !== index));
     };
 
     // Mock Submit
@@ -76,7 +85,8 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
                 description: description || 'No description provided',
                 type,
                 category,
-                imageUrl: imagePreview!, // Validated by form check
+                imageUrl: imagePreviews[0] || '', // Primary image
+                imageUrls: imagePreviews, // All images
                 location: {
                     lat: userLocation.coordinates?.lat || 0,
                     lng: userLocation.coordinates?.lng || 0,
@@ -283,53 +293,76 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
                         {/* Image Upload */}
                         <div>
                             <label className="block text-sm font-semibold text-text mb-2">
-                                Photo (Required) *
+                                Photos ({imagePreviews.length}/3) *
                             </label>
-                            <div className="relative">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                    required={!imagePreview}
-                                    id="gallery-input"
-                                />
-                                {imagePreview ? (
-                                    <div className="relative border-2 border-dashed border-primary/50 rounded-xl p-2 bg-black/5 dark:bg-white/5">
-                                        <img src={imagePreview} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
-                                        <button
-                                            type="button"
-                                            onClick={() => setImagePreview(null)}
-                                            className="absolute top-3 right-3 p-1.5 bg-black/60 rounded-full hover:bg-black/80 transition"
-                                        >
-                                            <X className="w-4 h-4 text-white" />
-                                        </button>
-                                    </div>
-                                ) : (
+
+                            {/* Grid of Previews */}
+                            {imagePreviews.length > 0 && (
+                                <div className="grid grid-cols-3 gap-3 mb-4">
+                                    {imagePreviews.map((preview, index) => (
+                                        <div key={index} className="relative aspect-square border-2 border-primary/30 rounded-xl overflow-hidden group">
+                                            <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(index)}
+                                                className="absolute top-1 right-1 p-1 bg-black/60 rounded-full hover:bg-black/80 transition opacity-0 group-hover:opacity-100"
+                                            >
+                                                <X className="w-3 h-3 text-white" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {imagePreviews.length < 3 && (
+                                        <label className="aspect-square border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-black/5 transition">
+                                            <Upload className="w-6 h-6 text-muted" />
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                multiple
+                                                onChange={handleImageChange}
+                                                className="hidden"
+                                            />
+                                        </label>
+                                    )}
+                                </div>
+                            )}
+
+                            {imagePreviews.length === 0 && (
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleImageChange}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                        required
+                                        id="gallery-input"
+                                    />
                                     <div className="border-2 border-dashed border-red-500/30 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer group bg-red-500/5">
                                         <div className="p-3 bg-black/5 dark:bg-white/5 rounded-full mb-3 group-hover:scale-110 group-hover:bg-primary/20 transition">
                                             <ImageIcon className="w-6 h-6 text-muted group-hover:text-primary transition" />
                                         </div>
                                         <p className="text-sm font-medium text-text">Choose from Gallery</p>
-                                        <p className="text-xs text-red-500 dark:text-red-400 mt-1">* Required to post</p>
+                                        <p className="text-xs text-red-500 dark:text-red-400 mt-1">Upload up to 3 photos</p>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
-                            {/* OR Camera Option */}
-                            {!imagePreview && (
+                            {/* Camera Option */}
+                            {imagePreviews.length < 3 && (
                                 <div className="mt-3">
-                                    <div className="relative text-center">
-                                        <div className="absolute inset-0 flex items-center">
-                                            <div className="w-full border-t border-border"></div>
+                                    {imagePreviews.length === 0 && (
+                                        <div className="relative text-center mb-3">
+                                            <div className="absolute inset-0 flex items-center">
+                                                <div className="w-full border-t border-border"></div>
+                                            </div>
+                                            <div className="relative flex justify-center text-xs">
+                                                <span className="px-2 bg-surface text-muted">OR</span>
+                                            </div>
                                         </div>
-                                        <div className="relative flex justify-center text-xs">
-                                            <span className="px-2 bg-surface text-muted">OR</span>
-                                        </div>
-                                    </div>
-                                    <label htmlFor="camera-input" className="mt-3 w-full py-2.5 px-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-border rounded-xl text-sm text-text hover:text-primary transition flex items-center justify-center gap-2 cursor-pointer">
+                                    )}
+                                    <label htmlFor="camera-input" className="w-full py-2.5 px-4 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-border rounded-xl text-sm text-text hover:text-primary transition flex items-center justify-center gap-2 cursor-pointer">
                                         <Upload className="w-4 h-4" />
-                                        Use Camera
+                                        Take Photo
                                         <input
                                             type="file"
                                             accept="image/*"

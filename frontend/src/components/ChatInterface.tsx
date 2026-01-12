@@ -9,9 +9,10 @@ interface ChatProps {
     initialContact?: { id: string; name: string; postId: number; postTitle: string; postType: 'LOST' | 'FOUND'; postImage?: string } | null;
     onShowConfirm?: (title: string, message: string, onConfirm: () => void, type?: 'confirm' | 'alert' | 'danger', confirmText?: string) => void;
     onShowAlert?: (title: string, message: string, type?: 'confirm' | 'alert' | 'danger') => void;
+    onOpenProfile?: (userId: string) => void;
 }
 
-export default function ChatInterface({ onClose, initialContact, onShowConfirm, onShowAlert }: ChatProps) {
+export default function ChatInterface({ onClose, initialContact, onShowConfirm, onShowAlert, onOpenProfile }: ChatProps) {
     const currentUser = AuthService.getCurrentUser();
     const [conversations, setConversations] = useState<ChatConversation[]>([]);
     const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -335,15 +336,20 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                                         exit={{ opacity: 0, scale: 0.9, y: 10 }}
                                         className="absolute -right-2 top-full mt-3 w-52 bg-surface/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[100] p-1.5"
                                     >
-                                        <button
-                                            onClick={() => { onShowAlert?.("Coming Soon", "User profiles will be available in a future update!", "alert"); setShowMenu(false); }}
-                                            className="w-full text-left px-4 py-3 rounded-xl text-sm text-text hover:bg-white/10 transition flex items-center gap-3 active:scale-95"
-                                        >
-                                            <div className="p-1.5 bg-blue-500/20 rounded-lg">
-                                                <UserIcon className="w-4 h-4 text-blue-500" />
-                                            </div>
-                                            <span className="font-semibold tracking-wide">View Profile</span>
-                                        </button>
+                                        {activeConversation && currentUser && String(activeConversation.participantId) !== String(currentUser.id) && (
+                                            <button
+                                                onClick={() => {
+                                                    onOpenProfile?.(activeConversation.participantId);
+                                                    setShowMenu(false);
+                                                }}
+                                                className="w-full text-left px-4 py-3 rounded-xl text-sm text-text hover:bg-white/10 transition flex items-center gap-3 active:scale-95"
+                                            >
+                                                <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                                                    <UserIcon className="w-4 h-4 text-blue-500" />
+                                                </div>
+                                                <span className="font-semibold tracking-wide">View Profile</span>
+                                            </button>
+                                        )}
                                         <button
                                             onClick={handleClearChat}
                                             className="w-full text-left px-4 py-3 rounded-xl text-sm text-orange-500 hover:bg-orange-500/10 transition flex items-center gap-3 active:scale-95"

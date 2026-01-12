@@ -12,6 +12,8 @@ interface FeedViewProps {
     selectedCategory: CategoryId | 'ALL';
     selectedType: 'ALL' | 'LOST' | 'FOUND';
     currentUser: User | null;
+    onOpenDetail: (post: Post) => void;
+    onOpenProfile: (userId: string) => void;
 }
 
 export default function FeedView({
@@ -21,7 +23,9 @@ export default function FeedView({
     searchQuery,
     selectedCategory,
     selectedType,
-    currentUser
+    currentUser,
+    onOpenDetail,
+    onOpenProfile
 }: FeedViewProps) {
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
@@ -93,7 +97,9 @@ export default function FeedView({
                                 <PostCard
                                     key={post.id}
                                     post={post}
+                                    onClick={() => onOpenDetail(post)}
                                     onContact={() => onContact(post)}
+                                    onOpenProfile={() => onOpenProfile(post.userId)}
                                     onDelete={handleDelete}
                                     currentUser={currentUser}
                                 />

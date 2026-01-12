@@ -1,8 +1,26 @@
-import { supabase } from '../lib/supabase';
+import { supabase, USE_MOCK } from '../lib/supabase';
 import type { User } from '../types/auth';
+
+const STORAGE_KEYS = {
+    USER: 'khojsetu_current_user',
+    ALL_USERS: 'khojsetu_mock_users'
+};
 
 export const AuthService = {
     login: async (email: string, password: string): Promise<User> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Logging in...", email);
+            const mockUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_USERS) || '[]');
+            const existingUser = mockUsers.find((u: any) => u.email === email);
+
+            if (!existingUser) {
+                throw new Error("User not found in Mock Mode. Please sign up first.");
+            }
+
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(existingUser));
+            return existingUser;
+        }
+
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -10,7 +28,6 @@ export const AuthService = {
 
         if (error) throw error;
 
-        // Check if profile exists
         const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -19,7 +36,7 @@ export const AuthService = {
 
         let userProfile = profile;
 
-        // Auto-repair: If profile is missing (e.g. old user), create it
+        // Auto-repair if profile is missing
         if (!userProfile) {
             console.log("Profile missing, creating auto-repair profile...");
             const newProfile = {
@@ -49,7 +66,7 @@ export const AuthService = {
         };
 
         // Cache for legacy sync access if needed (optional)
-        localStorage.setItem('khojsetu_current_user', JSON.stringify(user));
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
         return user;
     },
 
@@ -57,6 +74,24 @@ export const AuthService = {
         // Use different avatar styles based on gender
         const avatarStyle = gender === 'male' ? 'personas' : 'personas';
         const avatarUrl = `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${name}&faceVariant=${gender === 'male' ? '01,02,04,05,06,07,08' : '03,09,10,11'}`;
+
+        if (USE_MOCK) {
+            console.log("Mock Mode: Signing up...", name);
+            const newUser: User = {
+                id: `mock-${Date.now()}`,
+                email,
+                name,
+                avatar: avatarUrl,
+                joinedAt: new Date()
+            };
+
+            const mockUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_USERS) || '[]');
+            mockUsers.push(newUser);
+            localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(mockUsers));
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+
+            return newUser;
+        }
 
         const { data, error } = await supabase.auth.signUp({
             email,
@@ -97,7 +132,7 @@ export const AuthService = {
             // Verify if it failed because trigger already created it (unlikely here but possible)
         }
 
-        localStorage.setItem('khojsetu_current_user', JSON.stringify(newUser));
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
         return newUser;
     },
 

@@ -9,10 +9,11 @@ interface PostCardProps {
     onClick?: () => void;
     onContact?: (post: Post) => void;
     onDelete?: (postId: number) => void;
+    onOpenProfile?: (userId: string) => void;
     currentUser: User | null;
 }
 
-export default function PostCard({ post, onClick, onContact, onDelete, currentUser }: PostCardProps) {
+export default function PostCard({ post, onClick, onContact, onDelete, onOpenProfile, currentUser }: PostCardProps) {
     // Check ownership
     // Use String constraints to ensure loose equality works regardless of number/string types
     const isOwner = currentUser && (String(post.userId) === String(currentUser.id));
@@ -76,10 +77,23 @@ export default function PostCard({ post, onClick, onContact, onDelete, currentUs
                     {post.description}
                 </p>
 
-                {/* Footer Info */}
-                <div className="flex items-center gap-2 text-xs text-muted mb-4">
-                    <MapPin className="w-3.5 h-3.5 text-primary" />
-                    <span className="truncate max-w-[200px]">{post.location.name || "Unknown Location"}</span>
+                {/* Footer Info & Profile Link */}
+                <div className="flex items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-2 text-xs text-muted truncate">
+                        <MapPin className="w-3.5 h-3.5 text-primary" />
+                        <span className="truncate">{post.location.name || "Unknown Location"}</span>
+                    </div>
+                    {onOpenProfile && !isOwner && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenProfile(post.userId);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-lighter dark:bg-white/5 border border-border text-muted hover:text-primary hover:border-primary transition group/btn"
+                        >
+                            <span className="text-xs font-bold tracking-wide">Profile</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Actions */}

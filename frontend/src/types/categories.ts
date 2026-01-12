@@ -66,7 +66,8 @@ export interface Post {
     description: string;
     type: 'LOST' | 'FOUND';
     category: CategoryId;
-    imageUrl?: string;
+    imageUrl?: string; // Kept as primary image for backward compatibility
+    imageUrls?: string[]; // Support for multiple images
     location: {
         lat: number;
         lng: number;

@@ -7,8 +7,10 @@ import ChatInterface from './components/ChatInterface';
 import AuthModal from './components/AuthModal';
 import MyPostsModal from './components/MyPostsModal';
 import ConfirmDialog from './components/ConfirmDialog';
-import ForgotPasswordModal from './components/ForgotPasswordModal'; // Added this import
+import ForgotPasswordModal from './components/ForgotPasswordModal';
 import Toast, { type ToastType } from './components/Toast';
+import PostDetailModal from './components/PostDetailModal';
+import UserProfileModal from './components/UserProfileModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthService } from './services/AuthService';
 import { PostService } from './services/PostService';
@@ -68,6 +70,10 @@ function App() {
   const [forgotPasswordStep, setForgotPasswordStep] = useState<1 | 2 | 3>(1);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  // Detail & Profile States
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
   // Header State Lifted
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | 'ALL'>('ALL');
@@ -88,7 +94,9 @@ function App() {
     });
 
     return () => {
-      channel.then(c => c.unsubscribe());
+      channel.then(c => {
+        c.unsubscribe();
+      });
     };
   }, [user]);
 
@@ -112,37 +120,12 @@ function App() {
     };
   }, []);
 
-  // One-time cleanup of legacy mock data (runs once per browser)
+  // Check for logged-in user on mount
   useEffect(() => {
-    const hasCleaned = localStorage.getItem('khojsetu_legacy_cleaned_v2');
-    if (!hasCleaned) {
-      console.log('🧹 Cleaning legacy mock data...');
-      const keysToRemove = [
-        'khojsetu_posts',
-        'khojsetu_chats',
-        'khojsetu_users',
-        'khojsetu_mock_creds',
-        'khojsetu_current_user' // Force re-login
-      ];
-      keysToRemove.forEach(k => localStorage.removeItem(k));
-      localStorage.setItem('khojsetu_legacy_cleaned_v2', 'true');
-
-      // Optional: Force reload to clear memory state
-      window.location.reload();
-    }
-  }, []);
-
-  // One-time cleanup of legacy data
-  useEffect(() => {
-    const hasCleaned = localStorage.getItem('khojsetu_cleaned_legacy');
-    if (!hasCleaned) {
-      console.log('Cleaning legacy data...');
-      localStorage.removeItem('khojsetu_posts');
-      localStorage.removeItem('khojsetu_chats');
-      localStorage.removeItem('khojsetu_users'); // Clears old users
-      localStorage.removeItem('khojsetu_user');  // Clears current session
-      localStorage.setItem('khojsetu_cleaned_legacy', 'true');
-      window.location.reload(); // Force reload to apply clean state
+    const currentUser = AuthService.getCurrentUser();
+    setUser(currentUser);
+    if (currentUser) {
+      loadPostCount(currentUser.id);
     }
   }, []);
 
@@ -293,12 +276,10 @@ function App() {
                     setIsAuthModalOpen(true);
                     return;
                   }
-                  // Prevent self-chat
                   if (String(post.userId) === String(user.id)) {
                     showToast("You cannot chat with yourself!", "error");
                     return;
                   }
-
                   setChatTarget({
                     id: post.userId,
                     name: post.createdByName || post.contactInfo?.split('@')[0] || `User ${String(post.userId).slice(0, 5)}`,
@@ -308,6 +289,8 @@ function App() {
                   });
                   setIsChatOpen(true);
                 }}
+                onOpenDetail={(post) => setSelectedPost(post)}
+                onOpenProfile={(uid) => setSelectedUserId(uid)}
                 onShowConfirm={showConfirm}
                 onShowToast={showToast}
               />
@@ -533,6 +516,10 @@ function App() {
             initialContact={chatTarget}
             onShowConfirm={showConfirm}
             onShowAlert={showAlert}
+            onOpenProfile={(uid) => {
+              setIsChatOpen(false);
+              setSelectedUserId(uid);
+            }}
           />
         )}
         {/* Authentication Modal */}
@@ -571,6 +558,62 @@ function App() {
             }}
             onShowConfirm={showConfirm}
             onShowToast={showToast}
+          />
+        )}
+
+        {/* Post Detail Modal */}
+        {selectedPost && (
+          <PostDetailModal
+            post={selectedPost}
+            onClose={() => setSelectedPost(null)}
+            onContact={(post) => {
+              setSelectedPost(null);
+              if (!user) {
+                showToast("Please login", "error");
+                setIsAuthModalOpen(true);
+                return;
+              }
+              setChatTarget({
+                id: post.userId,
+                name: post.createdByName || `User ${String(post.userId).slice(0, 5)}`,
+                postId: post.id,
+                postTitle: post.title,
+                postType: post.type
+              });
+              setIsChatOpen(true);
+            }}
+            onOpenProfile={(uid) => {
+              setSelectedPost(null);
+              setSelectedUserId(uid);
+            }}
+          />
+        )}
+
+        {/* User Profile Modal */}
+        {selectedUserId && (
+          <UserProfileModal
+            userId={selectedUserId}
+            onClose={() => setSelectedUserId(null)}
+            onContact={(post) => {
+              setSelectedUserId(null);
+              if (!user) {
+                showToast("Please login", "error");
+                setIsAuthModalOpen(true);
+                return;
+              }
+              setChatTarget({
+                id: post.userId,
+                name: post.createdByName || `User ${String(post.userId).slice(0, 5)}`,
+                postId: post.id,
+                postTitle: post.title,
+                postType: post.type
+              });
+              setIsChatOpen(true);
+            }}
+            onOpenPost={(post) => {
+              setSelectedUserId(null);
+              setSelectedPost(post);
+            }}
           />
         )}
       </AnimatePresence>
