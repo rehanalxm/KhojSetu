@@ -102,23 +102,20 @@ function App() {
 
   // Centralized Auth & Session Management
   useEffect(() => {
-    // 1. Initial Sync
-    const initAuth = async () => {
-      const currentUser = await AuthService.syncSession();
-      setUser(currentUser);
-      if (currentUser) {
-        loadPostCount(currentUser.id);
-      }
-    };
-    initAuth();
+    let isInitialSync = true;
 
-    // 2. Listen for Auth Changes
+    // Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
-      console.log("Auth Event:", event);
+      console.log("Supabase Auth Event:", event);
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        const syncedUser = await AuthService.syncSession();
-        setUser(syncedUser);
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Only sync if it's the first time or if the event is strictly after initial sync
+        if (isInitialSync || event !== 'INITIAL_SESSION') {
+          const syncedUser = await AuthService.syncSession();
+          setUser(syncedUser);
+          if (syncedUser) loadPostCount(syncedUser.id);
+          isInitialSync = false;
+        }
       }
 
       if (event === 'SIGNED_OUT') {

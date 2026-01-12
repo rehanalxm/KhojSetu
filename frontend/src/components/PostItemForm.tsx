@@ -67,7 +67,7 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
         fetchAddress();
     }, [userLocation.coordinates, reverseGeocode]);
 
-    const resizeImage = (base64Str: string, maxWidth = 1024, maxHeight = 1024): Promise<string> => {
+    const resizeImage = (base64Str: string, maxWidth = 800, maxHeight = 800): Promise<string> => {
         return new Promise((resolve) => {
             const img = new Image();
             img.src = base64Str;
@@ -92,7 +92,7 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx?.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', 0.8)); // 0.8 quality
+                resolve(canvas.toDataURL('image/jpeg', 0.6)); // Aggressive 0.6 quality
             };
         });
     };
