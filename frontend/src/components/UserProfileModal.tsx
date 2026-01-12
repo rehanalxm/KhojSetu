@@ -63,9 +63,8 @@ export default function UserProfileModal({ userId, onClose, onContact, onOpenPos
                 }
                 setProfile(userProfile);
 
-                // Fetch Posts
-                const allPosts = await PostService.getAllPosts();
-                const userPosts = allPosts.filter(p => p.userId === userId);
+                // Fetch Posts (Optimized: only for this user)
+                const userPosts = await PostService.getPostsByUser(userId);
                 setPosts(userPosts);
 
                 setStats({

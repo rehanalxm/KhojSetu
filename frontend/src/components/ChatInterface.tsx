@@ -19,6 +19,8 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [sending, setSending] = useState(false);
+    const [messages, setMessages] = useState<any[]>([]);
+    const [messagesLoading, setMessagesLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [showMenu, setShowMenu] = useState(false);
     const hasHandledInitial = useRef(false);
@@ -106,24 +108,45 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                 messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
             }, 100);
         }
-    }, [activeConversationId, conversations, input]);
+    }, [activeConversationId, messages, input]);
+
+    // Load messages when active conversation changes
+    useEffect(() => {
+        const fetchMessages = async () => {
+            if (!activeConversationId || !currentUser) {
+                setMessages([]);
+                return;
+            }
+
+            const activeConv = conversations.find(c => c.id === activeConversationId);
+            if (!activeConv || activeConversationId.startsWith('temp-')) {
+                setMessages([]); // Don't fetch for temps until real
+                return;
+            }
+
+            setMessagesLoading(true);
+            try {
+                const msgs = await ChatService.getMessages(
+                    currentUser.id,
+                    activeConv.participantId,
+                    activeConv.postId
+                );
+                setMessages(msgs);
+            } catch (error) {
+                console.error("Failed to load messages:", error);
+            } finally {
+                setMessagesLoading(false);
+            }
+        };
+
+        fetchMessages();
+    }, [activeConversationId, currentUser?.id]);
 
     const loadConversations = async () => {
         if (!currentUser) return;
         try {
             const convs = await ChatService.getConversations(currentUser.id);
-            // Preserve the active conversation if it was a temporary new one
-            setConversations(() => {
-                // Merge real convs with temps (deduplicate if temp became real)
-                // For simplicity, we just use real convs, but if we are in a temp chat, keep it?
-                // Actually, if a message was received for a temp chat, it would now be a real chat in 'convs'.
-
-                // We should check if the active conversation (if temp) is now in the list
-                return convs;
-            });
-
-            // If we had a temp conversation that got a real message, we should switch to the real ID?
-            // This is complex. For now, simple reload.
+            setConversations(convs);
         } catch (error) {
             console.error('Failed to load conversations:', error);
         }
@@ -446,7 +469,12 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                 ) : (
                     // Messages View
                     <div className="p-4 flex flex-col h-full">
-                        {activeConversation?.messages && activeConversation.messages.length === 0 ? (
+                        {messagesLoading ? (
+                            <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <span>Loading messages...</span>
+                            </div>
+                        ) : messages.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-center">
                                 <p className="text-sm text-gray-400">No messages yet</p>
                                 <p className="text-xs text-gray-500 mt-1">Say Hello! 👋</p>
@@ -454,7 +482,7 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                         ) : (
                             <>
                                 <div className="space-y-3 overflow-y-auto flex-1">
-                                    {activeConversation?.messages.map((msg, index) => {
+                                    {messages.map((msg, index) => {
                                         const isCurrentUser = msg.senderId === currentUser?.id;
                                         const isRefCard = msg.text.startsWith('[REF_CARD]');
 

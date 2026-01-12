@@ -39,6 +39,10 @@ export const ChatService = {
      * Get all conversations for the current user
      * Since we don't have a 'conversations' table, we infer them from messages
      */
+    /**
+     * Get all conversations for the current user
+     * Optimized: Returns metadata and last message only
+     */
     getConversations: async (userId: string): Promise<ChatConversation[]> => {
         let messages: any[] = [];
 
@@ -47,11 +51,18 @@ export const ChatService = {
             const allMessages = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
             messages = allMessages.filter((m: any) => m.sender_id === userId || m.receiver_id === userId);
         } else {
-            // Fetch all messages involving the user
+            // Optimized query: We just need to find all unique conversations
+            // In a better schema, we'd have a 'conversations' table. 
+            // Here, we fetch messages but group them.
             const { data, error } = await supabase
                 .from('messages')
                 .select(`
-                    *,
+                    id, 
+                    content, 
+                    created_at, 
+                    sender_id, 
+                    receiver_id, 
+                    post_id,
                     sender:sender_id (name, avatar_url, email),
                     receiver:receiver_id (name, avatar_url, email),
                     post:post_id (title, type)
@@ -69,12 +80,9 @@ export const ChatService = {
         const conversationsMap = new Map<string, ChatConversation>();
 
         for (const msg of messages) {
-            // Determine the "other" participant
             const isSender = msg.sender_id === userId;
             const participantId = isSender ? msg.receiver_id : msg.sender_id;
             const participant = isSender ? msg.receiver : msg.sender;
-
-            // Unique Key for a conversation: PostID + ParticipantID
             const conversationKey = `${msg.post_id}_${participantId}`;
 
             if (!conversationsMap.has(conversationKey)) {
@@ -87,7 +95,7 @@ export const ChatService = {
                     postId: msg.post_id,
                     postTitle: msg.post?.title || 'Unknown Post',
                     postType: msg.post?.type || 'LOST',
-                    messages: [],
+                    messages: [], // Initialize empty, will be loaded on demand
                     createdAt: new Date(msg.created_at),
                     lastMessageAt: new Date(msg.created_at),
                     lastMessage: msg.content,
@@ -95,24 +103,58 @@ export const ChatService = {
                 });
             }
 
-            const conv = conversationsMap.get(conversationKey)!;
-
-            // Add message to conversation
-            conv.messages.push({
-                id: msg.id.toString(),
-                senderId: msg.sender_id,
-                senderName: (USE_MOCK ? (isSender ? 'You' : conv.participantName) : (msg.sender?.name || 'Unknown')),
-                senderAvatar: (USE_MOCK ? (isSender ? '' : conv.participantAvatar) : (msg.sender?.avatar_url || '')),
-                text: msg.content,
-                timestamp: new Date(msg.created_at),
-                messageType: 'text',
-            });
-
-            // Re-sort messages by time ascending within conversation
-            conv.messages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+            // We no longer push all messages into the list metadata
         }
 
         return Array.from(conversationsMap.values()).sort((a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime());
+    },
+
+    /**
+     * Get messages for a specific conversation
+     */
+    getMessages: async (userId: string, participantId: string, postId: number): Promise<ChatMessage[]> => {
+        if (USE_MOCK) {
+            const allMessages = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const convMessages = allMessages.filter((m: any) =>
+                m.post_id === postId &&
+                ((m.sender_id === userId && m.receiver_id === participantId) ||
+                    (m.sender_id === participantId && m.receiver_id === userId))
+            );
+            return convMessages.map((msg: any) => ({
+                id: msg.id.toString(),
+                senderId: msg.sender_id,
+                senderName: msg.sender_id === userId ? 'You' : 'Participant',
+                senderAvatar: '',
+                text: msg.content,
+                timestamp: new Date(msg.created_at),
+                messageType: 'text',
+            })).sort((a: ChatMessage, b: ChatMessage) => a.timestamp.getTime() - b.timestamp.getTime());
+        }
+
+        const { data, error } = await supabase
+            .from('messages')
+            .select(`
+                *,
+                sender:sender_id (name, avatar_url)
+            `)
+            .eq('post_id', postId)
+            .or(`and(sender_id.eq.${userId},receiver_id.eq.${participantId}),and(sender_id.eq.${participantId},receiver_id.eq.${userId})`)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error("Error fetching messages:", error);
+            return [];
+        }
+
+        return (data || []).map((msg) => ({
+            id: msg.id.toString(),
+            senderId: msg.sender_id,
+            senderName: msg.sender?.name || 'Unknown',
+            senderAvatar: msg.sender?.avatar_url || '',
+            text: msg.content,
+            timestamp: new Date(msg.created_at),
+            messageType: 'text',
+        }));
     },
 
     /**

@@ -139,8 +139,7 @@ function App() {
   }, []);
 
   const loadPostCount = async (userId: string) => {
-    const posts = await PostService.getAllPosts();
-    const count = posts.filter(p => p.userId === userId).length;
+    const count = await PostService.getUserPostCount(userId);
     setUserPostCount(count);
   };
 

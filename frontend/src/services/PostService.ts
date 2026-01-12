@@ -21,7 +21,8 @@ export const PostService = {
                 *,
                 profiles:user_id (name)
             `)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(50); // Optimization: Limit to latest 50 for speed
 
         if (error) {
             console.error("Error fetching posts:", error);
@@ -74,19 +75,19 @@ export const PostService = {
 
         const realUserId = user.id;
 
-        // Ensure profile exists before posting (Fix for Foreign Key Constraint Error)
-        const { error: profileError } = await supabase
+        // Ensure profile exists (Optimized: trigger non-blocking sync if name/email available)
+        supabase
             .from('profiles')
             .upsert({
                 id: realUserId,
                 name: postData.createdByName || user.user_metadata?.name || 'Anonymous',
                 email: realUserId === postData.userId ? postData.contactInfo : user.email,
-                avatar_url: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${realUserId}`
-            }, { onConflict: 'id' });
-
-        if (profileError) {
-            console.error("Profile sync failed (non-blocking):", profileError);
-        }
+                avatar_url: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${realUserId}`,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'id' })
+            .then(({ error: profileError }) => {
+                if (profileError) console.error("Profile sync error (non-blocking):", profileError);
+            });
 
         const { data: insertData, error } = await supabase
             .from('posts')
@@ -156,5 +157,64 @@ export const PostService = {
         // Basic implementation: Just return all posts for now or add a text search
         // Supabase Vector is needed for real image search, for now we can filter by type/category if needed
         return PostService.getAllPosts();
+    },
+
+    getPostsByUser: async (userId: string): Promise<Post[]> => {
+        if (USE_MOCK) {
+            const allPosts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            return allPosts.filter((p: any) => p.userId === userId);
+        }
+
+        const { data, error } = await supabase
+            .from('posts')
+            .select(`
+                *,
+                profiles:user_id (name)
+            `)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching user posts:", error);
+            return [];
+        }
+
+        return (data || []).map((p) => ({
+            id: p.id,
+            title: p.title,
+            description: p.description,
+            type: p.type,
+            category: p.category,
+            imageUrl: p.image_url,
+            imageUrls: p.image_urls || [p.image_url].filter(Boolean),
+            location: {
+                lat: p.location_lat,
+                lng: p.location_lng,
+                name: p.location_name
+            },
+            timestamp: new Date(p.created_at),
+            userId: p.user_id,
+            contactInfo: p.contact_info,
+            createdByName: p.profiles?.name
+        }));
+    },
+
+    getUserPostCount: async (userId: string): Promise<number> => {
+        if (USE_MOCK) {
+            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            return posts.filter((p: any) => p.userId === userId).length;
+        }
+
+        const { count, error } = await supabase
+            .from('posts')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+
+        if (error) {
+            console.error("Error getting post count:", error);
+            return 0;
+        }
+
+        return count || 0;
     }
 };
