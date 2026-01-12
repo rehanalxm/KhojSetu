@@ -64,26 +64,30 @@ export const PostService = {
             return newPost;
         }
 
+        // In Supabase mode, we MUST use the real session ID to satisfy RLS
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Authentication required to post.");
+
+        const realUserId = user.id;
+
         // Ensure profile exists before posting (Fix for Foreign Key Constraint Error)
-        // Using upsert ensures that if the profile doesn't exist, it's created,
-        // and if it does exist, it's updated or left alone depending on RLS.
         const { error: profileError } = await supabase
             .from('profiles')
             .upsert({
-                id: postData.userId,
-                name: postData.createdByName || 'Anonymous',
-                email: postData.contactInfo || 'No Email',
-                avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${postData.userId}`
+                id: realUserId,
+                name: postData.createdByName || user.user_metadata?.name || 'Anonymous',
+                email: realUserId === postData.userId ? postData.contactInfo : user.email,
+                avatar_url: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${realUserId}`
             }, { onConflict: 'id' });
 
         if (profileError) {
             console.error("Profile sync failed (non-blocking):", profileError);
         }
 
-        const { data, error } = await supabase
+        const { data: insertData, error } = await supabase
             .from('posts')
             .insert({
-                user_id: postData.userId,
+                user_id: realUserId,
                 title: postData.title,
                 description: postData.description,
                 type: postData.type,
@@ -104,21 +108,21 @@ export const PostService = {
         }
 
         return {
-            id: data.id,
-            title: data.title,
-            description: data.description,
-            type: data.type,
-            category: data.category,
-            imageUrl: data.image_url,
-            imageUrls: data.image_urls || [data.image_url].filter(Boolean),
+            id: insertData.id,
+            title: insertData.title,
+            description: insertData.description,
+            type: insertData.type,
+            category: insertData.category,
+            imageUrl: insertData.image_url,
+            imageUrls: insertData.image_urls || [insertData.image_url].filter(Boolean),
             location: {
-                lat: data.location_lat,
-                lng: data.location_lng,
-                name: data.location_name
+                lat: insertData.location_lat,
+                lng: insertData.location_lng,
+                name: insertData.location_name
             },
-            timestamp: new Date(data.created_at),
-            userId: data.user_id,
-            contactInfo: data.contact_info
+            timestamp: new Date(insertData.created_at),
+            userId: insertData.user_id,
+            contactInfo: insertData.contact_info
         };
     },
 

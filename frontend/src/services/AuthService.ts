@@ -148,6 +148,33 @@ export const AuthService = {
         if (error) throw error;
     },
 
+    async syncSession(): Promise<User | null> {
+        if (USE_MOCK) return AuthService.getCurrentUser();
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            localStorage.removeItem(STORAGE_KEYS.USER);
+            return null;
+        }
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+        const user: User = {
+            id: session.user.id,
+            email: session.user.email!,
+            name: profile?.name || session.user.user_metadata?.name || session.user.email!.split('@')[0],
+            avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url,
+            joinedAt: new Date(session.user.created_at)
+        };
+
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+        return user;
+    },
+
     async verifyOtp(email: string, token: string) {
         const { data, error } = await supabase.auth.verifyOtp({
             email,

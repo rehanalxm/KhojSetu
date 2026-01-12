@@ -100,15 +100,36 @@ function App() {
     };
   }, [user]);
 
-  // Handle Supabase Password Recovery Redirection
+  // Centralized Auth & Session Management
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any) => {
+    // 1. Initial Sync
+    const initAuth = async () => {
+      const currentUser = await AuthService.syncSession();
+      setUser(currentUser);
+      if (currentUser) {
+        loadPostCount(currentUser.id);
+      }
+    };
+    initAuth();
+
+    // 2. Listen for Auth Changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth Event:", event);
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        const syncedUser = await AuthService.syncSession();
+        setUser(syncedUser);
+      }
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        localStorage.removeItem('khojsetu_current_user');
+      }
+
       if (event === 'PASSWORD_RECOVERY') {
         setForgotPasswordStep(3);
         setShowForgotPassword(true);
-        setIsAuthModalOpen(false); // Close login modal if open
-
-        // Clear the hash/params from the URL to prevent subsequent loops
+        setIsAuthModalOpen(false);
         if (window.location.hash || window.location.search) {
           window.history.replaceState(null, '', window.location.pathname);
         }
@@ -118,24 +139,6 @@ function App() {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
-
-  // Check for logged-in user on mount
-  useEffect(() => {
-    const currentUser = AuthService.getCurrentUser();
-    setUser(currentUser);
-    if (currentUser) {
-      loadPostCount(currentUser.id);
-    }
-  }, []);
-
-  // Check for logged-in user on mount
-  useEffect(() => {
-    const currentUser = AuthService.getCurrentUser();
-    setUser(currentUser);
-    if (currentUser) {
-      loadPostCount(currentUser.id);
-    }
   }, []);
 
   const loadPostCount = async (userId: string) => {
