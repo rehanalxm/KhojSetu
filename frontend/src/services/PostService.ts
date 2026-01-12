@@ -66,7 +66,11 @@ export const PostService = {
 
         // In Supabase mode, we MUST use the real session ID to satisfy RLS
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Authentication required to post.");
+        if (!user) {
+            // Force a clean logout in local storage if we hit this, as the session is clearly dead
+            localStorage.removeItem('khojsetu_current_user');
+            throw new Error("Session expired. Please log in again to post.");
+        }
 
         const realUserId = user.id;
 

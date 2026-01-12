@@ -172,7 +172,15 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
             window.location.reload();
         } catch (err) {
             console.error(err);
-            onShowAlert?.("Post Failed", err instanceof Error ? err.message : 'Unknown error', "danger");
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+
+            if (errorMessage.toLowerCase().includes('session expired') || errorMessage.toLowerCase().includes('authentication required')) {
+                onShowAlert?.("Login Required", "Your session has expired. Press confirm to log in again.", "alert");
+                setLoading(false);
+                return;
+            }
+
+            onShowAlert?.("Post Failed", errorMessage, "danger");
             setLoading(false);
         }
     };
