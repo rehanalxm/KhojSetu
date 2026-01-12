@@ -45,5 +45,23 @@ export const useGeolocation = () => {
         navigator.geolocation.getCurrentPosition(onSuccess, onError);
     };
 
-    return { location, getCurrentLocation };
+    const reverseGeocode = async (lat: number, lng: number) => {
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&accept-language=en`
+            );
+            const data = await response.json();
+            return {
+                address: data.display_name,
+                city: data.address.city || data.address.town || data.address.village || data.address.suburb || '',
+                state: data.address.state || '',
+                country: data.address.country || '',
+            };
+        } catch (error) {
+            console.error("Reverse geocoding failed:", error);
+            return null;
+        }
+    };
+
+    return { location, getCurrentLocation, reverseGeocode };
 };

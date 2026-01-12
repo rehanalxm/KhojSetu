@@ -19,18 +19,53 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [step, setStep] = useState<1 | 2>(1); // Two-step form
     const [locationName, setLocationName] = useState('');
-    const { location: userLocation, getCurrentLocation } = useGeolocation();
+    const { location: userLocation, getCurrentLocation, reverseGeocode } = useGeolocation();
+    const [geocoding, setGeocoding] = useState(false);
 
     useEffect(() => {
         if (userLocation.coordinates && !locationName) {
             setLocationName(`${userLocation.coordinates.lat.toFixed(4)}, ${userLocation.coordinates.lng.toFixed(4)}`);
         }
-    }, [userLocation, locationName]);
+    }, [userLocation.coordinates, locationName]);
 
-    const handleUseCurrentLocation = () => {
+    const handleUseCurrentLocation = async () => {
         getCurrentLocation();
         setLocationName('Fetching location...');
+
+        // We'll wait for the userLocation to update in the next effect or monitor it here
     };
+
+    // New effect to handle reverse geocoding when coordinates are fetched
+    useEffect(() => {
+        const fetchAddress = async () => {
+            if (userLocation.coordinates && (locationName === 'Fetching location...' || !locationName)) {
+                setGeocoding(true);
+                const data = await reverseGeocode(userLocation.coordinates.lat, userLocation.coordinates.lng);
+                if (data) {
+                    // Find the inputs and set their values if possible, 
+                    // or use state if we refactor to controlled components.
+                    // For now, we'll try to find them in the DOM to avoid huge refactor, 
+                    // or just update locationName.
+
+                    const countryInput = document.querySelector('input[name="country"]') as HTMLInputElement;
+                    const stateInput = document.querySelector('input[name="state"]') as HTMLInputElement;
+                    const cityInput = document.querySelector('input[name="city"]') as HTMLInputElement;
+                    const landmarkInput = document.querySelector('input[name="landmark"]') as HTMLInputElement;
+
+                    if (countryInput) countryInput.value = data.country;
+                    if (stateInput) stateInput.value = data.state;
+                    if (cityInput) cityInput.value = data.city;
+                    if (landmarkInput) landmarkInput.value = data.address.split(',')[0];
+
+                    setLocationName(data.address.split(',')[0]);
+                } else {
+                    setLocationName(`${userLocation.coordinates.lat.toFixed(4)}, ${userLocation.coordinates.lng.toFixed(4)}`);
+                }
+                setGeocoding(false);
+            }
+        };
+        fetchAddress();
+    }, [userLocation.coordinates, reverseGeocode]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
@@ -262,7 +297,7 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
                                     disabled={userLocation.loaded && !userLocation.coordinates && !userLocation.error}
                                     className="px-4 py-2.5 bg-primary/20 border border-primary/30 rounded-xl text-primary text-sm font-medium hover:bg-primary/30 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                 >
-                                    {userLocation.loaded && !userLocation.coordinates && !userLocation.error ? (
+                                    {geocoding || (userLocation.loaded && !userLocation.coordinates && !userLocation.error) ? (
                                         <Loader2 className="w-4 h-4 animate-spin" />
                                     ) : (
                                         <>
