@@ -113,7 +113,7 @@ function App() {
     initAuth();
 
     // 2. Listen for Auth Changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
       console.log("Auth Event:", event);
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
