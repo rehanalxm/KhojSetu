@@ -14,6 +14,7 @@ import UserProfileModal from './components/UserProfileModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthService } from './services/AuthService';
 import { PostService } from './services/PostService';
+import { ChatService } from './services/ChatService';
 import { supabase } from './lib/supabase';
 import type { User } from './types/auth';
 import Header from './components/Header';
@@ -86,17 +87,13 @@ function App() {
   useEffect(() => {
     if (!user) return;
 
-    const channel = import('./services/ChatService').then(({ ChatService }) => {
-      return ChatService.subscribeToMessages(user.id, () => {
-        setHasUnreadMessages(true);
-        showToast('You have a new message!', 'success');
-      });
+    const channel = ChatService.subscribeToMessages(user.id, () => {
+      setHasUnreadMessages(true);
+      showToast('You have a new message!', 'success');
     });
 
     return () => {
-      channel.then(c => {
-        c.unsubscribe();
-      });
+      channel.unsubscribe();
     };
   }, [user]);
 

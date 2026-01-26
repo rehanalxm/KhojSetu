@@ -26,7 +26,7 @@ export const PostService = {
 
         if (error) {
             console.error("Error fetching posts:", error);
-            return [];
+            throw new Error(error.message || 'Failed to fetch posts');
         }
 
         return (data || []).map((p) => ({

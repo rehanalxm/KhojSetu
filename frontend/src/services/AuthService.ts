@@ -7,6 +7,21 @@ const STORAGE_KEYS = {
 };
 
 export const AuthService = {
+    /**
+     * Helper to format User object from Supabase session or profile
+     */
+    _formatUser: (supaUser: any, profile?: any): User => {
+        const metadata = supaUser.user_metadata || {};
+        return {
+            id: supaUser.id,
+            email: supaUser.email!,
+            // Prioritize profile name, then metadata, then email fallback
+            name: profile?.name || metadata.name || supaUser.email!.split('@')[0],
+            avatar: profile?.avatar_url || metadata.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${supaUser.email}`,
+            joinedAt: new Date(supaUser.created_at)
+        };
+    },
+
     login: async (email: string, password: string): Promise<User> => {
         if (USE_MOCK) {
             console.log("Mock Mode: Logging in...", email);
@@ -27,7 +42,9 @@ export const AuthService = {
         });
 
         if (error) throw error;
+        if (!data.user) throw new Error("Login succeeded but no user returned.");
 
+        // Fetch profile for complete user data
         const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -36,7 +53,7 @@ export const AuthService = {
 
         let userProfile = profile;
 
-        // Auto-repair if profile is missing
+        // Auto-repair profile if missing
         if (!userProfile) {
             console.log("Profile missing, creating auto-repair profile...");
             const newProfile = {
@@ -50,22 +67,13 @@ export const AuthService = {
                 .from('profiles')
                 .insert(newProfile);
 
-            if (!insertError) {
-                userProfile = newProfile;
-            } else {
-                console.error("Failed to auto-create profile:", insertError);
-            }
+            if (!insertError) userProfile = newProfile;
+            else console.error("Failed to auto-create profile:", insertError);
         }
 
-        const user: User = {
-            id: data.user.id,
-            email: data.user.email!,
-            name: userProfile?.name || data.user.user_metadata?.name || email.split('@')[0],
-            avatar: userProfile?.avatar_url || data.user.user_metadata?.avatar_url,
-            joinedAt: new Date(data.user.created_at)
-        };
+        const user = AuthService._formatUser(data.user, userProfile);
 
-        // Cache for legacy sync access if needed (optional)
+        // Update local storage for immediate UI access (legacy support)
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
         return user;
     },
@@ -74,6 +82,7 @@ export const AuthService = {
         // Use different avatar styles based on gender
         const avatarStyle = gender === 'male' ? 'personas' : 'personas';
         const avatarUrl = `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${name}&faceVariant=${gender === 'male' ? '01,02,04,05,06,07,08' : '03,09,10,11'}`;
+        const metadata = { name, gender, avatar_url: avatarUrl };
 
         if (USE_MOCK) {
             console.log("Mock Mode: Signing up...", name);
@@ -93,46 +102,34 @@ export const AuthService = {
             return newUser;
         }
 
+        // 1. SignUp with Metadata
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: {
-                data: {
-                    name,
-                    gender,
-                    avatar_url: avatarUrl
-                }
-            }
+            options: { data: metadata }
         });
 
         if (error) throw error;
         if (!data.user) throw new Error("Signup failed");
 
-        const newUser: User = {
-            id: data.user.id,
-            email: email,
-            name: name,
-            avatar: avatarUrl,
-            joinedAt: new Date()
-        };
-
+        // 2. Create Profile explicit entry (Backup for trigger failure)
+        // We use upsert to avoid conflict if trigger runs faster
         const { error: profileError } = await supabase
             .from('profiles')
-            .insert({
-                id: newUser.id,
-                email: newUser.email,
-                name: newUser.name,
-                avatar_url: newUser.avatar,
+            .upsert({
+                id: data.user.id,
+                email: email,
+                name: name,
+                avatar_url: avatarUrl,
                 gender: gender,
-                created_at: newUser.joinedAt.toISOString()
-            });
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
 
-        if (profileError) {
-            console.error("Profile creation failed:", profileError);
-            // Verify if it failed because trigger already created it (unlikely here but possible)
-        }
+        if (profileError) console.error("Profile creation warning:", profileError.message);
 
+        const newUser: User = AuthService._formatUser(data.user, { name, avatar_url: avatarUrl });
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+
         return newUser;
     },
 
@@ -142,6 +139,8 @@ export const AuthService = {
     },
 
     async forgotPassword(email: string) {
+        // IMPORTANT: The redirect URL must match your deployed domain or localhost
+        // App.tsx handles the recovery token on load
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin,
         });
@@ -151,26 +150,24 @@ export const AuthService = {
     async syncSession(): Promise<User | null> {
         if (USE_MOCK) return AuthService.getCurrentUser();
 
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        // Check active session from Supabase (Source of Truth)
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error || !session) {
             localStorage.removeItem(STORAGE_KEYS.USER);
             return null;
         }
 
+        // Fetch latest profile data
         const { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', session.user.id)
             .single();
 
-        const user: User = {
-            id: session.user.id,
-            email: session.user.email!,
-            name: profile?.name || session.user.user_metadata?.name || session.user.email!.split('@')[0],
-            avatar: profile?.avatar_url || session.user.user_metadata?.avatar_url,
-            joinedAt: new Date(session.user.created_at)
-        };
+        const user = AuthService._formatUser(session.user, profile);
 
+        // Sync local storage
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
         return user;
     },

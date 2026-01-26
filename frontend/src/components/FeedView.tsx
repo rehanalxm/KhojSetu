@@ -29,15 +29,26 @@ export default function FeedView({
 }: FeedViewProps) {
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const loadPosts = async () => {
         setLoading(true);
+        setError(null);
         try {
+            // Quick connection check first
+            if (!import.meta.env.VITE_USE_MOCK) {
+                const { connected, error: connError } = await import('../lib/supabase').then(m => m.checkConnection());
+                if (!connected) {
+                    throw new Error(`Connection failed: ${connError || 'Unknown error'}`);
+                }
+            }
+
             const data = await PostService.getAllPosts();
             setPosts(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load posts', error);
-            onShowToast('Failed to load posts', 'error');
+            setError(error.message || 'Failed to load posts');
+            onShowToast('Failed to load content. Check connection.', 'error');
         } finally {
             setLoading(false);
         }
@@ -81,6 +92,18 @@ export default function FeedView({
                     <div className="flex justify-center items-center py-20">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                     </div>
+                ) : error ? (
+                    <div className="text-center py-20">
+                        <div className="text-6xl mb-4">⚠️</div>
+                        <h3 className="text-xl font-bold text-white mb-2">Connection Error</h3>
+                        <p className="text-red-400 mb-6 max-w-md mx-auto">{error}</p>
+                        <button
+                            onClick={loadPosts}
+                            className="px-6 py-2 bg-primary text-white rounded-full hover:bg-opacity-90 transition-all font-medium"
+                        >
+                            Try Again
+                        </button>
+                    </div>
                 ) : filteredPosts.length === 0 ? (
                     <div className="text-center py-20">
                         <div className="text-6xl mb-4">🔍</div>
@@ -108,6 +131,6 @@ export default function FeedView({
                     </>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
