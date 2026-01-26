@@ -13,7 +13,7 @@ interface ForgotPasswordModalProps {
 export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick, initialStep = 1 }: ForgotPasswordModalProps) {
     const [step, setStep] = useState<1 | 2 | 3>(initialStep); // 1: Email, 2: OTP/Link Sent, 3: New Password
     const [email, setEmail] = useState('');
-    const [otp, setOtp] = useState(''); // Not used in link flow but kept for structure
+    // const [otp, setOtp] = useState(''); // Removed unused state to fix build error
     const [newPassword, setNewPassword] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -40,6 +40,8 @@ export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick, ini
         }
     };
 
+    // OTP Verification removed as we use Magic Link now
+
     const handleResetPassword = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -53,7 +55,6 @@ export default function ForgotPasswordModal({ isOpen, onClose, onLoginClick, ini
                 // Reset state
                 setStep(1);
                 setEmail('');
-                setOtp('');
                 setNewPassword('');
                 setSuccessMessage('');
             }, 2000);

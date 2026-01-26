@@ -5,6 +5,11 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('Supabase credentials missing. App is running in Mock Mode.');
+} else {
+    console.log('Supabase Connected:', {
+        url: supabaseUrl.substring(0, 15) + '...',
+        hasKey: !!supabaseAnonKey
+    });
 }
 
 const finalUrl = supabaseUrl.startsWith('http') ? supabaseUrl : 'https://placeholder.supabase.co';
