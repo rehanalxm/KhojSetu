@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import { Icon } from 'leaflet';
+import { Icon, LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { PostService } from '../services/PostService';
@@ -54,6 +54,36 @@ function LocationMarker() {
     );
 }
 
+// Component to fit map bounds based on posts
+function MapBoundsController({ posts }: { posts: Post[] }) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (posts.length === 0) {
+            // Default to world view if no posts
+            map.setView([20, 0], 2);
+            return;
+        }
+
+        if (posts.length === 1) {
+            // Center on single post
+            const post = posts[0];
+            map.setView([post.location.lat, post.location.lng], 12);
+            return;
+        }
+
+        // Calculate bounds for all posts
+        const bounds = new LatLngBounds(
+            posts.map(post => [post.location.lat, post.location.lng] as [number, number])
+        );
+        
+        // Fit map to bounds with padding
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }, [posts, map]);
+
+    return null;
+}
+
 interface LiveMapProps {
     currentUser: User | null;
     onContact?: (post: Post) => void;
@@ -73,13 +103,14 @@ export default function LiveMap({ currentUser, onContact, onDelete, onOpenDetail
         loadPosts();
     }, []);
 
-    const position: [number, number] = [51.505, -0.09];
+    // Default center - will be overridden by MapBoundsController
+    const defaultPosition: [number, number] = [20, 0];
 
     return (
         <div className="h-full w-full relative z-0">
             <MapContainer
-                center={position}
-                zoom={13}
+                center={defaultPosition}
+                zoom={2}
                 style={{ height: '100%', width: '100%' }}
                 className="z-0 bg-surface"
             >
@@ -92,6 +123,9 @@ export default function LiveMap({ currentUser, onContact, onDelete, onOpenDetail
                 />
 
                 <LocationMarker />
+                
+                {/* Controller to fit bounds to posts */}
+                <MapBoundsController posts={posts} />
 
                 {posts.map(post => {
                     const isOwner = currentUser && (String(post.userId) === String(currentUser.id));
@@ -106,8 +140,7 @@ export default function LiveMap({ currentUser, onContact, onDelete, onOpenDetail
                                     {post.imageUrl && (
                                         <div className="h-24 w-full mb-2 rounded-lg overflow-hidden relative">
                                             <img src={post.imageUrl} className="w-full h-full object-cover" />
-                                            <span className={`absolute top-1 left-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${post.type === 'LOST' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-                                                }`}>
+                                            <span className={`absolute top-1 left-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${post.type === 'LOST' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
                                                 {post.type}
                                             </span>
                                         </div>

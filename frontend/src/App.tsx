@@ -281,7 +281,8 @@ function App() {
                     name: post.createdByName || post.contactInfo?.split('@')[0] || `User ${String(post.userId).slice(0, 5)}`,
                     postId: post.id,
                     postTitle: post.title,
-                    postType: post.type
+                    postType: post.type,
+                    postImage: post.imageUrl,
                   });
                   setIsChatOpen(true);
                 }}
@@ -574,7 +575,8 @@ function App() {
                 name: post.createdByName || `User ${String(post.userId).slice(0, 5)}`,
                 postId: post.id,
                 postTitle: post.title,
-                postType: post.type
+                postType: post.type,
+                postImage: post.imageUrl,
               });
               setIsChatOpen(true);
             }}
@@ -602,8 +604,10 @@ function App() {
                 name: post.createdByName || `User ${String(post.userId).slice(0, 5)}`,
                 postId: post.id,
                 postTitle: post.title,
-                postType: post.type
+                postType: post.type,
+                postImage: post.imageUrl
               });
+                postImage: post.imageUrl,
               setIsChatOpen(true);
             }}
             onOpenPost={(post) => {

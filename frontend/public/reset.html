@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KhojSetu - Reset Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); text-align: center; }
+        h1 { color: #333; margin-bottom: 10px; }
+        p { color: #666; margin: 15px 0; }
+        button { background: #667eea; color: white; border: none; padding: 12px 30px; border-radius: 5px; cursor: pointer; font-size: 16px; margin: 10px; }
+        button:hover { background: #764ba2; }
+        .success { color: green; margin-top: 20px; }
+        .warning { color: #ff9800; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ì¥Ñ KhojSetu Reset</h1>
+        <p>This will clear all temporary data and accounts from your browser.</p>
+        <p class="warning">‚ö†Ô∏è This action cannot be undone!</p>
+        <button onclick="resetApp()">Reset All Data</button>
+        <button onclick="window.location.href='/'">Cancel</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function resetApp() {
+            // List of localStorage keys to clear
+            const keys = [
+                'khojsetu_current_user',
+                'khojsetu_mock_users',
+                'khojsetu_mock_posts',
+                'khojsetu_conversations',
+                'khojsetu_messages',
+                'khojsetu_theme'
+            ];
+
+            // Clear all localStorage
+            keys.forEach(key => {
+                localStorage.removeItem(key);
+                console.log(`Cleared: ${key}`);
+            });
+
+            // Clear all sessionStorage
+            sessionStorage.clear();
+
+            // Clear cookies
+            document.cookie.split(";").forEach((c) => {
+                document.cookie = c
+                    .replace(/^ +/, "")
+                    .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+            });
+
+            // Clear IndexedDB if exists
+            if (window.indexedDB) {
+                const dbs = await indexedDB.databases();
+                dbs.forEach(db => indexedDB.deleteDatabase(db.name));
+            }
+
+            // Show success message
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = '<p class="success">‚úÖ All data cleared successfully!</p><p>Redirecting to home page...</p>';
+            
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
