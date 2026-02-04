@@ -1,11 +1,11 @@
 -- ============================================================================
--- KHOJSETU - COMPLETE CORRECTED SCHEMA
--- This schema is 100% compatible with your frontend code
--- Run each script ONE AT A TIME in Supabase SQL Editor
+-- KHOJSETU - CORRECTED DATABASE SCHEMA
+-- This schema is fully aligned with backend authentication and code requirements
+-- Copy and paste each script ONE AT A TIME into Supabase SQL Editor
 -- ============================================================================
 
 -- ============================================================================
--- SCRIPT 1: CREATE PROFILES TABLE
+-- TABLE 1: PROFILES (User Accounts)
 -- ============================================================================
 CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -18,23 +18,15 @@ CREATE TABLE profiles (
 );
 
 CREATE INDEX idx_profiles_email ON profiles(email);
-
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "profiles_select_policy" ON profiles
-  FOR SELECT USING (true);
-
-CREATE POLICY "profiles_update_policy" ON profiles
-  FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "profiles_insert_policy" ON profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "profiles_delete_policy" ON profiles
-  FOR DELETE USING (auth.uid() = id);
+CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (true);
+CREATE POLICY "profiles_insert" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "profiles_update" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "profiles_delete" ON profiles FOR DELETE USING (auth.uid() = id);
 
 -- ============================================================================
--- SCRIPT 2: CREATE POSTS TABLE
+-- TABLE 2: POSTS (Lost/Found Items)
 -- ============================================================================
 CREATE TABLE posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,20 +52,13 @@ CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
 
 ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "posts_select_policy" ON posts
-  FOR SELECT USING (true);
-
-CREATE POLICY "posts_insert_policy" ON posts
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "posts_update_policy" ON posts
-  FOR UPDATE USING (auth.uid() = user_id);
-
-CREATE POLICY "posts_delete_policy" ON posts
-  FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "posts_select" ON posts FOR SELECT USING (true);
+CREATE POLICY "posts_insert" ON posts FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "posts_update" ON posts FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "posts_delete" ON posts FOR DELETE USING (auth.uid() = user_id);
 
 -- ============================================================================
--- SCRIPT 3: CREATE CONVERSATIONS TABLE
+-- TABLE 3: CONVERSATIONS (Chat Threads Between Users)
 -- ============================================================================
 CREATE TABLE conversations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -91,28 +76,17 @@ CREATE INDEX idx_conversations_post ON conversations(post_id);
 
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "conversations_select_policy" ON conversations
-  FOR SELECT USING (
-    auth.uid() = user_1_id OR auth.uid() = user_2_id
-  );
-
-CREATE POLICY "conversations_insert_policy" ON conversations
-  FOR INSERT WITH CHECK (
-    auth.uid() = user_1_id OR auth.uid() = user_2_id
-  );
-
-CREATE POLICY "conversations_update_policy" ON conversations
-  FOR UPDATE USING (
-    auth.uid() = user_1_id OR auth.uid() = user_2_id
-  );
-
-CREATE POLICY "conversations_delete_policy" ON conversations
-  FOR DELETE USING (
-    auth.uid() = user_1_id OR auth.uid() = user_2_id
-  );
+CREATE POLICY "conversations_select" ON conversations 
+  FOR SELECT USING (auth.uid() = user_1_id OR auth.uid() = user_2_id);
+CREATE POLICY "conversations_insert" ON conversations 
+  FOR INSERT WITH CHECK (auth.uid() = user_1_id OR auth.uid() = user_2_id);
+CREATE POLICY "conversations_update" ON conversations 
+  FOR UPDATE USING (auth.uid() = user_1_id OR auth.uid() = user_2_id);
+CREATE POLICY "conversations_delete" ON conversations 
+  FOR DELETE USING (auth.uid() = user_1_id OR auth.uid() = user_2_id);
 
 -- ============================================================================
--- SCRIPT 4: CREATE MESSAGES TABLE
+-- TABLE 4: MESSAGES (Individual Chat Messages)
 -- ============================================================================
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -129,7 +103,7 @@ CREATE INDEX idx_messages_created_at ON messages(created_at);
 
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "messages_select_policy" ON messages
+CREATE POLICY "messages_select" ON messages
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM conversations c
@@ -137,35 +111,21 @@ CREATE POLICY "messages_select_policy" ON messages
       AND (c.user_1_id = auth.uid() OR c.user_2_id = auth.uid())
     )
   );
-
-CREATE POLICY "messages_insert_policy" ON messages
-  FOR INSERT WITH CHECK (auth.uid() = sender_id);
-
-CREATE POLICY "messages_delete_policy" ON messages
-  FOR DELETE USING (auth.uid() = sender_id);
+CREATE POLICY "messages_insert" ON messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
+CREATE POLICY "messages_delete" ON messages FOR DELETE USING (auth.uid() = sender_id);
 
 -- ============================================================================
--- VERIFICATION QUERY
+-- VERIFICATION - Run this to confirm all tables created correctly
 -- ============================================================================
--- Run this to verify all tables exist and are accessible:
-
 SELECT 
-  table_name,
+  tablename,
   CASE 
-    WHEN table_name = 'profiles' THEN '✓ Profiles table'
-    WHEN table_name = 'posts' THEN '✓ Posts table'
-    WHEN table_name = 'conversations' THEN '✓ Conversations table'
-    WHEN table_name = 'messages' THEN '✓ Messages table'
+    WHEN tablename = 'profiles' THEN '✓ Profiles (user accounts)'
+    WHEN tablename = 'posts' THEN '✓ Posts (lost/found items)'
+    WHEN tablename = 'conversations' THEN '✓ Conversations (chat threads)'
+    WHEN tablename = 'messages' THEN '✓ Messages (chat messages)'
   END as status
-FROM information_schema.tables
-WHERE table_schema = 'public'
-AND table_name IN ('profiles', 'posts', 'conversations', 'messages')
-ORDER BY table_name;
-
--- ============================================================================
--- CLEANUP (OPTIONAL - Only run if you need to delete everything and start fresh)
--- ============================================================================
--- DROP TABLE IF EXISTS messages CASCADE;
--- DROP TABLE IF EXISTS conversations CASCADE;
--- DROP TABLE IF EXISTS posts CASCADE;
--- DROP TABLE IF EXISTS profiles CASCADE;
+FROM pg_tables
+WHERE schemaname = 'public'
+AND tablename IN ('profiles', 'posts', 'conversations', 'messages')
+ORDER BY tablename;
