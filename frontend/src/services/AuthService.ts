@@ -6,6 +6,14 @@ const STORAGE_KEYS = {
     ALL_USERS: 'khojsetu_mock_users'
 };
 
+const OTP_STORAGE_KEYS = {
+    PENDING_EMAIL: 'khojsetu_pending_email',
+    PENDING_PASSWORD: 'khojsetu_pending_password',
+    PENDING_NAME: 'khojsetu_pending_name',
+    PENDING_GENDER: 'khojsetu_pending_gender',
+    OTP_SESSION: 'khojsetu_otp_session'
+};
+
 export const AuthService = {
     /**
      * Helper to format User object from Supabase session or profile
@@ -15,13 +23,104 @@ export const AuthService = {
         return {
             id: supaUser.id,
             email: supaUser.email!,
-            // Prioritize profile name, then metadata, then email fallback
             name: profile?.name || metadata.name || supaUser.email!.split('@')[0],
             avatar: profile?.avatar_url || metadata.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${supaUser.email}`,
             joinedAt: new Date(supaUser.created_at)
         };
     },
 
+    // ============ SIGNUP WITH OTP ============
+    signupInitiate: async (name: string, email: string, password: string, gender: 'male' | 'female'): Promise<void> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Storing signup data...");
+            localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
+            localStorage.setItem(OTP_STORAGE_KEYS.PENDING_PASSWORD, password);
+            localStorage.setItem(OTP_STORAGE_KEYS.PENDING_NAME, name);
+            localStorage.setItem(OTP_STORAGE_KEYS.PENDING_GENDER, gender);
+            localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, `mock-otp-${Date.now()}`);
+            return;
+        }
+
+        localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
+        localStorage.setItem(OTP_STORAGE_KEYS.PENDING_PASSWORD, password);
+        localStorage.setItem(OTP_STORAGE_KEYS.PENDING_NAME, name);
+        localStorage.setItem(OTP_STORAGE_KEYS.PENDING_GENDER, gender);
+
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: { shouldCreateUser: false },
+        });
+
+        if (error) throw error;
+        console.log("OTP sent to", email);
+    },
+
+    verifyOtpAndSignup: async (email: string, token: string): Promise<User> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Verifying OTP...");
+            const name = localStorage.getItem(OTP_STORAGE_KEYS.PENDING_NAME);
+            const gender = (localStorage.getItem(OTP_STORAGE_KEYS.PENDING_GENDER) || 'male') as 'male' | 'female';
+
+            const avatarUrl = `https://api.dicebear.com/7.x/personas/svg?seed=${name}`;
+            const newUser: User = {
+                id: `mock-${Date.now()}`,
+                email,
+                name: name || 'User',
+                avatar: avatarUrl,
+                joinedAt: new Date()
+            };
+
+            const mockUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_USERS) || '[]');
+            mockUsers.push(newUser);
+            localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(mockUsers));
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+
+            localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_EMAIL);
+            localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_PASSWORD);
+            localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_NAME);
+            localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_GENDER);
+
+            return newUser;
+        }
+
+        const { data, error } = await supabase.auth.verifyOtp({
+            email,
+            token,
+            type: 'email',
+        });
+
+        if (error) throw error;
+        if (!data.user) throw new Error("OTP verification failed");
+
+        const pendingName = localStorage.getItem(OTP_STORAGE_KEYS.PENDING_NAME) || email.split('@')[0];
+        const pendingGender = (localStorage.getItem(OTP_STORAGE_KEYS.PENDING_GENDER) || 'male') as 'male' | 'female';
+        const avatarUrl = `https://api.dicebear.com/7.x/personas/svg?seed=${pendingName}`;
+
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+                id: data.user.id,
+                email: email,
+                name: pendingName,
+                avatar_url: avatarUrl,
+                gender: pendingGender,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+
+        if (profileError) console.error("Profile creation warning:", profileError.message);
+
+        const newUser: User = AuthService._formatUser(data.user, { name: pendingName, avatar_url: avatarUrl });
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+
+        localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_EMAIL);
+        localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_PASSWORD);
+        localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_NAME);
+        localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_GENDER);
+
+        return newUser;
+    },
+
+    // ============ LOGIN ============
     login: async (email: string, password: string): Promise<User> => {
         if (USE_MOCK) {
             console.log("Mock Mode: Logging in...", email);
@@ -44,7 +143,6 @@ export const AuthService = {
         if (error) throw error;
         if (!data.user) throw new Error("Login succeeded but no user returned.");
 
-        // Fetch profile for complete user data
         const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -53,9 +151,7 @@ export const AuthService = {
 
         let userProfile = profile;
 
-        // Auto-repair profile if missing
         if (!userProfile) {
-            console.log("Profile missing, creating auto-repair profile...");
             const newProfile = {
                 id: data.user.id,
                 email: data.user.email,
@@ -72,20 +168,15 @@ export const AuthService = {
         }
 
         const user = AuthService._formatUser(data.user, userProfile);
-
-        // Update local storage for immediate UI access (legacy support)
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
         return user;
     },
 
     signup: async (name: string, email: string, password: string, gender: 'male' | 'female'): Promise<User> => {
-        // Use different avatar styles based on gender
-        const avatarStyle = gender === 'male' ? 'personas' : 'personas';
-        const avatarUrl = `https://api.dicebear.com/7.x/${avatarStyle}/svg?seed=${name}&faceVariant=${gender === 'male' ? '01,02,04,05,06,07,08' : '03,09,10,11'}`;
+        const avatarUrl = `https://api.dicebear.com/7.x/personas/svg?seed=${name}`;
         const metadata = { name, gender, avatar_url: avatarUrl };
 
         if (USE_MOCK) {
-            console.log("Mock Mode: Signing up...", name);
             const newUser: User = {
                 id: `mock-${Date.now()}`,
                 email,
@@ -102,7 +193,6 @@ export const AuthService = {
             return newUser;
         }
 
-        // 1. SignUp with Metadata
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
@@ -112,8 +202,6 @@ export const AuthService = {
         if (error) throw error;
         if (!data.user) throw new Error("Signup failed");
 
-        // 2. Create Profile explicit entry (Backup for trigger failure)
-        // We use upsert to avoid conflict if trigger runs faster
         const { error: profileError } = await supabase
             .from('profiles')
             .upsert({
@@ -133,14 +221,70 @@ export const AuthService = {
         return newUser;
     },
 
+    // ============ PASSWORD RESET WITH OTP ============
+    forgotPasswordInitiate: async (email: string): Promise<void> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Sending reset OTP...");
+            localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
+            localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, `mock-reset-otp-${Date.now()}`);
+            return;
+        }
+
+        localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
+
+        const { error } = await supabase.auth.signInWithOtp({
+            email,
+            options: { shouldCreateUser: false },
+        });
+
+        if (error) throw error;
+    },
+
+    verifyOtpForPasswordReset: async (email: string, token: string): Promise<string> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: OTP verified for password reset");
+            const session = `mock-session-${Date.now()}`;
+            localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, session);
+            return session;
+        }
+
+        const { data, error } = await supabase.auth.verifyOtp({
+            email,
+            token,
+            type: 'email',
+        });
+
+        if (error) throw error;
+        if (!data.session) throw new Error("Session creation failed");
+
+        localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, data.session.access_token);
+        return data.session.access_token;
+    },
+
+    completePasswordReset: async (newPassword: string): Promise<void> => {
+        if (USE_MOCK) {
+            console.log("Mock Mode: Password reset successful");
+            localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_EMAIL);
+            localStorage.removeItem(OTP_STORAGE_KEYS.OTP_SESSION);
+            return;
+        }
+
+        const { error } = await supabase.auth.updateUser({
+            password: newPassword,
+        });
+
+        if (error) throw error;
+
+        localStorage.removeItem(OTP_STORAGE_KEYS.PENDING_EMAIL);
+        localStorage.removeItem(OTP_STORAGE_KEYS.OTP_SESSION);
+    },
+
     logout: async () => {
         await supabase.auth.signOut();
-        localStorage.removeItem('khojsetu_current_user');
+        localStorage.removeItem(STORAGE_KEYS.USER);
     },
 
     async forgotPassword(email: string) {
-        // IMPORTANT: The redirect URL must match your deployed domain or localhost
-        // App.tsx handles the recovery token on load
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin,
         });
@@ -150,7 +294,6 @@ export const AuthService = {
     async syncSession(): Promise<User | null> {
         if (USE_MOCK) return AuthService.getCurrentUser();
 
-        // Check active session from Supabase (Source of Truth)
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error || !session) {
@@ -158,7 +301,6 @@ export const AuthService = {
             return null;
         }
 
-        // Fetch latest profile data
         const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -166,8 +308,6 @@ export const AuthService = {
             .single();
 
         const user = AuthService._formatUser(session.user, profile);
-
-        // Sync local storage
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
         return user;
     },
@@ -190,18 +330,16 @@ export const AuthService = {
     deleteAccount: async (userId: string): Promise<void> => {
         console.log("Starting account deletion for:", userId);
 
-        // 1. Delete all messages (Try-Catch each to avoid blocking)
         try {
             const { error } = await supabase
                 .from('messages')
                 .delete()
                 .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-            if (error) console.error("Non-critical: Error deleting some messages (might be RLS):", error.message);
+            if (error) console.error("Non-critical: Error deleting messages:", error.message);
         } catch (e) {
             console.error("Non-critical: Exception during messages deletion:", e);
         }
 
-        // 2. Delete all posts
         try {
             const { error } = await supabase
                 .from('posts')
@@ -212,40 +350,20 @@ export const AuthService = {
             console.error("Non-critical: Exception during posts deletion:", e);
         }
 
-        // 3. Delete the user profile (CRITICAL STEP)
-        console.log("Attempting to delete profile record...");
         const { error: profileError } = await supabase
             .from('profiles')
             .delete()
             .eq('id', userId);
 
         if (profileError) {
-            console.error("CRITICAL: Failed to delete profile:", profileError.message);
             throw new Error(`Profile deletion failed: ${profileError.message}`);
         }
 
-        // Verify profile is actually gone (to debug trigger)
-        const { data: checkProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', userId)
-            .single();
-
-        if (checkProfile) {
-            console.error("CRITICAL: Profile still exists after delete command!");
-            throw new Error("Profile record persists after deletion. Trigger cannot run.");
-        }
-
-        console.log("Profile deleted successfully. Proceeding to logout.");
-
-        // 4. Logout the user
         await AuthService.logout();
     },
 
     getCurrentUser: (): User | null => {
-        // Fallback to local storage for synchronous access
-        // Ideally we should use supabase.auth.getUser() async
-        const stored = localStorage.getItem('khojsetu_current_user');
+        const stored = localStorage.getItem(STORAGE_KEYS.USER);
         if (stored) {
             try {
                 const u = JSON.parse(stored);
