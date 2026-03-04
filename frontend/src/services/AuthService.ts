@@ -34,7 +34,7 @@ export const AuthService = {
                 profile?.avatar_url ||
                 metadata.avatar_url ||
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-            isAdmin: profile?.is_admin === true || metadata.isAdmin === true || email === 'techiedox@gmail.com',
+            isAdmin: profile?.is_admin === true || metadata.isAdmin === true,
             joinedAt: new Date(supaUser.created_at)
         };
     },
@@ -292,17 +292,14 @@ export const AuthService = {
 
     // ======================== SESSION / LOGOUT ========================
     logout: async () => {
-        console.log('AuthService: Starting logout process...');
         try {
             if (!USE_MOCK) {
-                await supabase.auth.signOut().catch(err => console.warn('AuthService: SignOut warning:', err));
+                await supabase.auth.signOut();
             }
         } catch (err) {
-            console.warn('AuthService: Logout exception:', err);
-        } finally {
-            localStorage.removeItem(STORAGE_KEYS.USER);
-            console.log('AuthService: Local user data cleared.');
+            console.warn('Logout warning:', err);
         }
+        localStorage.removeItem(STORAGE_KEYS.USER);
     },
 
     async forgotPassword(email: string) {
@@ -326,26 +323,22 @@ export const AuthService = {
         if (USE_MOCK) return AuthService.getCurrentUser();
 
         try {
-            console.log('AuthService: Syncing session...');
             let session = providedSession;
 
             if (!session) {
                 const { data, error } = await supabase.auth.getSession();
-
-                if (error || !data?.session) {
-                    console.log('AuthService: No active session found.');
+                if (error || !data.session) {
                     localStorage.removeItem(STORAGE_KEYS.USER);
                     return null;
                 }
                 session = data.session;
             }
 
-            if (!session?.user) {
+            if (!session) {
                 localStorage.removeItem(STORAGE_KEYS.USER);
                 return null;
             }
 
-            console.log('AuthService: Fetching profile for sync...');
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('*')
@@ -354,14 +347,11 @@ export const AuthService = {
 
             const user = AuthService._formatUser(session.user, profile);
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-            console.log('AuthService: Sync complete for', user.email);
             return user;
         } catch (err) {
-            console.error('AuthService: syncSession failed or timed out:', err);
-            // Don't clear storage on timeout unless we're sure there's no user, 
-            // but for reliability during errors, clearing is safer.
-            // localStorage.removeItem(STORAGE_KEYS.USER);
-            return AuthService.getCurrentUser(); // Return stale local user if we hit a glitch
+            console.error('syncSession failed:', err);
+            localStorage.removeItem(STORAGE_KEYS.USER);
+            return null;
         }
     },
 

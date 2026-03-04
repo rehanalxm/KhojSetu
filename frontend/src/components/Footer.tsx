@@ -119,17 +119,11 @@ export default function Footer({ onOpenAdmin }: FooterProps) {
 
                 {/* Final Credits Bar - Unified & World Class */}
                 <div className="mt-24 pt-10 border-t border-border flex flex-col xl:flex-row justify-between items-center gap-10">
-                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                        <p className="text-gray-500 text-xs">
-                            &copy; 2026 KhojSetu. All rights reserved.
-                            <span className="ml-2 text-primary/40 font-mono">v2.1-SS</span>
-                        </p>
-                        <div className="flex items-center gap-8 flex-wrap justify-center text-[13px] font-bold text-muted/60">
-                            <span className="text-text/30 uppercase tracking-[0.1em]">© {currentYear} KhojSetu Platform</span>
-                            <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-                            <a href="#" className="hover:text-primary transition-colors">Terms</a>
-                            <a href="#" className="hover:text-primary transition-colors">Guidelines</a>
-                        </div>
+                    <div className="flex items-center gap-8 flex-wrap justify-center text-[13px] font-bold text-muted/60">
+                        <span className="text-text/30 uppercase tracking-[0.1em]">© {currentYear} KhojSetu Platform</span>
+                        <a href="#" className="hover:text-primary transition-colors">Privacy</a>
+                        <a href="#" className="hover:text-primary transition-colors">Terms</a>
+                        <a href="#" className="hover:text-primary transition-colors">Guidelines</a>
                     </div>
 
                     <button

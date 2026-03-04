@@ -8,21 +8,21 @@ const STORAGE_KEY = 'khojsetu_mock_posts';
 // ---------------------------------------------------------------------------
 const mapRow = (p: any): Post => ({
     id: p.id,
-    title: p.title || 'Untitled Item',
-    description: p.description || 'No description provided',
-    type: (p.type || 'LOST').toUpperCase() as 'LOST' | 'FOUND',
-    category: (p.category || 'OTHER').toUpperCase() as any,
-    imageUrl: p.image_url || '',
+    title: p.title,
+    description: p.description,
+    type: p.type,
+    category: p.category,
+    imageUrl: p.image_url,
     imageUrls: p.image_urls || [p.image_url].filter(Boolean),
     location: {
-        lat: p.location_lat || 0,
-        lng: p.location_lng || 0,
-        name: p.location_name || 'Unknown Location'
+        lat: p.location_lat,
+        lng: p.location_lng,
+        name: p.location_name
     },
-    timestamp: p.created_at ? new Date(p.created_at) : new Date(),
-    userId: p.user_id || '',
-    contactInfo: p.contact_info || '',
-    createdByName: p.profiles?.name || 'Anonymous'
+    timestamp: new Date(p.created_at),
+    userId: p.user_id,
+    contactInfo: p.contact_info,
+    createdByName: p.profiles?.name
 });
 
 export const PostService = {
@@ -40,21 +40,19 @@ export const PostService = {
         try {
             const { data, error } = await supabase
                 .from('posts')
-                .select(`*, profiles!user_id (name)`)
+                .select(`*, profiles:user_id (name)`)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
             if (error) {
-                console.error('Database Error in getAllPosts:', error);
-                // SHIELD: If it's a connection/abort error, don't crash, try to return empty or cached
-                return [];
+                console.error('Error fetching posts:', error);
+                throw new Error(error.message || 'Failed to fetch posts');
             }
 
             return (data || []).map(mapRow);
         } catch (err: any) {
-            console.error('Critical exception in getAllPosts:', err);
-            // FINAL SHIELD: Return empty array so UI stays alive
-            return [];
+            console.error('getAllPosts failed:', err);
+            throw new Error(err?.message || 'Failed to load posts. Please try again.');
         }
     },
 
@@ -211,7 +209,7 @@ export const PostService = {
         try {
             const { data, error } = await supabase
                 .from('posts')
-                .select(`*, profiles!user_id (name)`)
+                .select(`*, profiles:user_id (name)`)
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 

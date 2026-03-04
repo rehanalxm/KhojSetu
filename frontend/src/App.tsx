@@ -26,9 +26,6 @@ import type { Post } from './types/categories';
 
 type ViewMode = 'feed' | 'map';
 
-const VERSION = "2.1-SHOWCASE-STABLE";
-console.log(`%c🚀 KHOJSETU ${VERSION} %cInitializing...`, "color: #10b981; font-weight: bold; font-size: 16px;", "color: grey;");
-
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('feed');
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
@@ -163,21 +160,16 @@ function App() {
     setUserPostCount(count);
   };
 
-  const handleLogout = async () => {
-    try {
-      await AuthService.logout();
-      setUser(null);
-      setShowProfileMenu(false);
-      setUserPostCount(0);
-      showToast('Logged out successfully', 'success');
-      // Force page reload after short delay to ensure state is cleared
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 500);
-    } catch (error) {
-      console.error("Logout error:", error);
-      window.location.href = '/'; // Fallback reload
-    }
+  const handleLogout = () => {
+    AuthService.logout();
+    setUser(null);
+    setShowProfileMenu(false);
+    setUserPostCount(0);
+    showToast('Logged out successfully', 'success');
+    // Force page reload to clear all state
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 500);
   };
 
   const handleDeleteAccount = () => {
@@ -193,7 +185,7 @@ function App() {
           setShowProfileMenu(false);
           setUserPostCount(0);
           showToast('Account deleted successfully', 'success');
-          // Force page reload after short delay
+          // Force page reload to clear all state
           setTimeout(() => {
             window.location.href = '/';
           }, 500);

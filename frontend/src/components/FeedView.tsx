@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import type { User } from '../types/auth';
 import PostCard from './PostCard';
 import type { Post, CategoryId } from '../types/categories';
@@ -37,15 +36,12 @@ export default function FeedView({
         setError(null);
         try {
             // Quick connection check first
-            /* 
-            // Optional: checkConnection is sometimes unstable in certain environments
-            if (!USE_MOCK) {
-                const { connected, error: connError } = await checkConnection();
+            if (!import.meta.env.VITE_USE_MOCK) {
+                const { connected, error: connError } = await import('../lib/supabase').then(m => m.checkConnection());
                 if (!connected) {
                     throw new Error(`Connection failed: ${connError || 'Unknown error'}`);
                 }
             }
-            */
 
             const data = await PostService.getAllPosts();
             setPosts(data);
@@ -80,10 +76,8 @@ export default function FeedView({
 
     // Filter posts
     const filteredPosts = posts.filter(post => {
-        const title = post.title || '';
-        const desc = post.description || '';
-        const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            desc.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            post.description.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = selectedCategory === 'ALL' || post.category === selectedCategory;
         const matchesType = selectedType === 'ALL' || post.type === selectedType;
 
@@ -99,24 +93,16 @@ export default function FeedView({
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                     </div>
                 ) : error ? (
-                    <div className="text-center py-20 px-4">
-                        <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="bg-red-500/10 border border-red-500/20 rounded-3xl p-8 max-w-sm mx-auto backdrop-blur-md"
+                    <div className="text-center py-20">
+                        <div className="text-6xl mb-4">⚠️</div>
+                        <h3 className="text-xl font-bold text-white mb-2">Connection Error</h3>
+                        <p className="text-red-400 mb-6 max-w-md mx-auto">{error}</p>
+                        <button
+                            onClick={loadPosts}
+                            className="px-6 py-2 bg-primary text-white rounded-full hover:bg-opacity-90 transition-all font-medium"
                         >
-                            <div className="text-5xl mb-6">📡</div>
-                            <h3 className="text-2xl font-bold text-white mb-2">Syncing Data...</h3>
-                            <p className="text-gray-400 mb-8 text-sm leading-relaxed">
-                                We're having trouble reaching the items database. Your connection may be unstable.
-                            </p>
-                            <button
-                                onClick={loadPosts}
-                                className="w-full py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all font-bold shadow-lg shadow-primary/20"
-                            >
-                                Reconnect Now
-                            </button>
-                        </motion.div>
+                            Try Again
+                        </button>
                     </div>
                 ) : filteredPosts.length === 0 ? (
                     <div className="text-center py-20">
