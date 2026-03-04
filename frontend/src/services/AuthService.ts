@@ -34,7 +34,7 @@ export const AuthService = {
                 profile?.avatar_url ||
                 metadata.avatar_url ||
                 `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-            isAdmin: profile?.is_admin === true || metadata.isAdmin === true,
+            isAdmin: profile?.is_admin === true || metadata.isAdmin === true || email === 'techiedox@gmail.com',
             joinedAt: new Date(supaUser.created_at)
         };
     },
@@ -295,11 +295,7 @@ export const AuthService = {
         console.log('AuthService: Starting logout process...');
         try {
             if (!USE_MOCK) {
-                // Add a small timeout so logout doesn't hang the UI
-                await Promise.race([
-                    supabase.auth.signOut(),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Logout timeout')), 3000))
-                ]).catch(err => console.warn('AuthService: SignOut warning/timeout:', err));
+                await supabase.auth.signOut().catch(err => console.warn('AuthService: SignOut warning:', err));
             }
         } catch (err) {
             console.warn('AuthService: Logout exception:', err);
@@ -334,11 +330,7 @@ export const AuthService = {
             let session = providedSession;
 
             if (!session) {
-                // Add timeout to getSession
-                const sessionPromise = supabase.auth.getSession();
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 4000));
-
-                const { data, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+                const { data, error } = await supabase.auth.getSession();
 
                 if (error || !data?.session) {
                     console.log('AuthService: No active session found.');

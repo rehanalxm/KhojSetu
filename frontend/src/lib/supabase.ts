@@ -75,16 +75,9 @@ export const checkConnection = async (): Promise<{
     }
 
     try {
-        // Add a 5 second timeout to the connection check to prevent infinite hangs
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Connection timed out after 5s')), 5000)
-        );
-
-        const fetchPromise = supabase
+        const { error } = await supabase
             .from('posts')
             .select('count', { count: 'exact', head: true });
-
-        const { error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
         if (error && error.code !== 'PGRST116') {
             console.error('Supabase connection check failed:', error);
