@@ -29,14 +29,10 @@ export default function AuthModal({ isOpen, onClose, onForgotPassword }: AuthMod
         setLoading(true);
 
         try {
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Login request timed out. Please try again.")), 8000)
-            );
-
             if (isLogin) {
-                await Promise.race([AuthService.login(email, password), timeoutPromise]);
+                await AuthService.login(email, password);
             } else {
-                await Promise.race([AuthService.signup(name, email, password, gender), timeoutPromise]);
+                await AuthService.signup(name, email, password, gender);
                 if (!USE_MOCK) {
                     setSuccess('Success! Please check your email to verify your account.');
                     setLoading(false);
