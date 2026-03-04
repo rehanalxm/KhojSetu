@@ -151,7 +151,7 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
             await PostService.createPost({
                 title: title || 'Lost Item',
                 description: description || 'No description provided',
-                type: type.toLowerCase(),
+                type: type,
                 category,
                 imageUrl: imagePreviews[0] || '', // Primary image
                 imageUrls: imagePreviews, // All images
