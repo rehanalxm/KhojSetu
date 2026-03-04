@@ -34,11 +34,11 @@ if (USE_MOCK) {
     );
 }
 
-// Create the Supabase client with NO persistence (fix "default logging" on refresh)
+// Create the Supabase client with persistence enabled
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        persistSession: false,
-        autoRefreshToken: false,
+        persistSession: true,
+        autoRefreshToken: true,
         detectSessionInUrl: true
     }
 });
