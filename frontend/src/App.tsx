@@ -538,6 +538,7 @@ function App() {
               <PostItemForm
                 onClose={() => setIsPostFormOpen(false)}
                 onShowAlert={showAlert}
+                currentUser={user}
               />
             </div>
           </motion.div>

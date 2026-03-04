@@ -346,9 +346,7 @@ export const AuthService = {
                 .single();
 
             const user = AuthService._formatUser(session.user, profile);
-            if (USE_MOCK) {
-                localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-            }
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
             return user;
         } catch (err) {
             console.error('syncSession failed:', err);

@@ -7,12 +7,15 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { PostService } from '../services/PostService';
 import { AuthService } from '../services/AuthService';
 
+import type { User } from '../types/auth';
+
 interface PostItemFormProps {
     onClose: () => void;
     onShowAlert?: (title: string, message: string, type?: 'confirm' | 'alert' | 'danger') => void;
+    currentUser: User | null;
 }
 
-export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps) {
+export default function PostItemForm({ onClose, onShowAlert, currentUser: propUser }: PostItemFormProps) {
     const [loading, setLoading] = useState(false);
     const [type, setType] = useState<'LOST' | 'FOUND'>('LOST');
     const [category, setCategory] = useState<CategoryId>('OTHER');
@@ -140,7 +143,7 @@ export default function PostItemForm({ onClose, onShowAlert }: PostItemFormProps
             const locationParts = [landmark, city, state, country].filter(Boolean);
             const locationString = locationParts.join(', ') || locationName || 'Unknown Location';
 
-            const currentUser = AuthService.getCurrentUser();
+            const currentUser = propUser || AuthService.getCurrentUser();
 
             if (!currentUser) {
                 onShowAlert?.("Login Required", "Please login to post an item.", "alert");
