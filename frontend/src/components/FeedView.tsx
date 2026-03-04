@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import type { User } from '../types/auth';
 import PostCard from './PostCard';
 import type { Post, CategoryId } from '../types/categories';
