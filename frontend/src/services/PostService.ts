@@ -8,21 +8,21 @@ const STORAGE_KEY = 'khojsetu_mock_posts';
 // ---------------------------------------------------------------------------
 const mapRow = (p: any): Post => ({
     id: p.id,
-    title: p.title,
-    description: p.description,
-    type: p.type,
-    category: p.category,
-    imageUrl: p.image_url,
+    title: p.title || 'Untitled Item',
+    description: p.description || 'No description provided',
+    type: (p.type || 'LOST').toUpperCase() as 'LOST' | 'FOUND',
+    category: (p.category || 'OTHER').toUpperCase() as any,
+    imageUrl: p.image_url || '',
     imageUrls: p.image_urls || [p.image_url].filter(Boolean),
     location: {
-        lat: p.location_lat,
-        lng: p.location_lng,
-        name: p.location_name
+        lat: p.location_lat || 0,
+        lng: p.location_lng || 0,
+        name: p.location_name || 'Unknown Location'
     },
-    timestamp: new Date(p.created_at),
-    userId: p.user_id,
-    contactInfo: p.contact_info,
-    createdByName: p.profiles?.name
+    timestamp: p.created_at ? new Date(p.created_at) : new Date(),
+    userId: p.user_id || '',
+    contactInfo: p.contact_info || '',
+    createdByName: p.profiles?.name || 'Anonymous'
 });
 
 export const PostService = {

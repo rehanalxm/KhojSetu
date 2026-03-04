@@ -80,8 +80,10 @@ export default function FeedView({
 
     // Filter posts
     const filteredPosts = posts.filter(post => {
-        const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            post.description.toLowerCase().includes(searchQuery.toLowerCase());
+        const title = post.title || '';
+        const desc = post.description || '';
+        const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            desc.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = selectedCategory === 'ALL' || post.category === selectedCategory;
         const matchesType = selectedType === 'ALL' || post.type === selectedType;
 
