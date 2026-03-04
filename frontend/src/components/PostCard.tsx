@@ -32,12 +32,12 @@ export default function PostCard({ post, onClick, onContact, onDelete, onOpenPro
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/40">
                 {/* Status & Category Badges (Floating) */}
                 <div className="absolute top-4 left-4 z-10 flex gap-2">
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold shadow-lg backdrop-blur-md border border-white/20 flex items-center gap-1.5 ${post.type === 'LOST'
+                    <div className={`px-3 py-1 rounded-full text-xs font-bold shadow-lg backdrop-blur-md border border-white/20 flex items-center gap-1.5 ${post.type?.toUpperCase() === 'LOST'
                         ? 'bg-red-500/90 text-white'
                         : 'bg-green-500/90 text-white'
                         }`}>
-                        <div className={`w-2 h-2 rounded-full ${post.type === 'LOST' ? 'bg-white animate-pulse' : 'bg-white'}`}></div>
-                        {post.type}
+                        <div className={`w-2 h-2 rounded-full ${post.type?.toUpperCase() === 'LOST' ? 'bg-white animate-pulse' : 'bg-white'}`}></div>
+                        {post.type?.toUpperCase()}
                     </div>
                 </div>
                 {post.imageUrl ? (

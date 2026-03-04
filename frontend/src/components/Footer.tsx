@@ -1,7 +1,11 @@
-import { Github, Linkedin, Twitter, Heart, MapPin, Globe, Shield, HelpCircle, Compass, ArrowUpRight } from 'lucide-react';
+import { Github, Linkedin, Twitter, Heart, MapPin, Globe, Shield, HelpCircle, Compass } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-export default function Footer() {
+interface FooterProps {
+    onOpenAdmin?: () => void;
+}
+
+export default function Footer({ onOpenAdmin }: FooterProps) {
     const currentYear = new Date().getFullYear();
 
     const handleHomeClick = () => {
@@ -122,11 +126,9 @@ export default function Footer() {
                         <a href="#" className="hover:text-primary transition-colors">Guidelines</a>
                     </div>
 
-                    <a
-                        href="https://rehanportfolio.vercel.app/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group relative px-8 py-3 bg-surface hover:bg-surface/80 border border-border rounded-2xl transition-all duration-500 flex items-center gap-3 active:scale-95"
+                    <button
+                        onClick={onOpenAdmin}
+                        className="group relative px-8 py-3 bg-surface hover:bg-surface/80 border border-border rounded-2xl transition-all duration-500 flex items-center gap-3 active:scale-95 cursor-pointer"
                     >
                         <div className="flex items-center gap-2.5 text-[13px] font-bold text-muted group-hover:text-text transition-colors">
                             <span>Designed & Developed with</span>
@@ -139,11 +141,11 @@ export default function Footer() {
                             <span>by</span>
                         </div>
                         <div className="h-4 w-px bg-white/10" />
-                        <span className="text-[14px] font-black bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent group-hover:tracking-wider transition-all duration-500">
-                            REHAN ALAM
+                        <span className="text-[14px] font-black bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent group-hover:tracking-wider transition-all duration-500 uppercase">
+                            Team Dox
                         </span>
-                        <ArrowUpRight className="w-4 h-4 text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                    </a>
+                        <Shield className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
+                    </button>
                 </div>
             </div>
 

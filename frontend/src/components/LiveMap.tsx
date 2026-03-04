@@ -76,7 +76,7 @@ function MapBoundsController({ posts }: { posts: Post[] }) {
         const bounds = new LatLngBounds(
             posts.map(post => [post.location.lat, post.location.lng] as [number, number])
         );
-        
+
         // Fit map to bounds with padding
         map.fitBounds(bounds, { padding: [50, 50] });
     }, [posts, map]);
@@ -123,7 +123,7 @@ export default function LiveMap({ currentUser, onContact, onDelete, onOpenDetail
                 />
 
                 <LocationMarker />
-                
+
                 {/* Controller to fit bounds to posts */}
                 <MapBoundsController posts={posts} />
 
@@ -133,15 +133,15 @@ export default function LiveMap({ currentUser, onContact, onDelete, onOpenDetail
                         <Marker
                             key={post.id}
                             position={[post.location.lat, post.location.lng]}
-                            icon={post.type === 'LOST' ? lostIcon : foundIcon}
+                            icon={post.type?.toUpperCase() === 'LOST' ? lostIcon : foundIcon}
                         >
                             <Popup className="custom-popup">
                                 <div className="min-w-[200px]">
                                     {post.imageUrl && (
                                         <div className="h-24 w-full mb-2 rounded-lg overflow-hidden relative">
                                             <img src={post.imageUrl} className="w-full h-full object-cover" />
-                                            <span className={`absolute top-1 left-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${post.type === 'LOST' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
-                                                {post.type}
+                                            <span className={`absolute top-1 left-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${post.type?.toUpperCase() === 'LOST' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'}`}>
+                                                {post.type?.toUpperCase()}
                                             </span>
                                         </div>
                                     )}

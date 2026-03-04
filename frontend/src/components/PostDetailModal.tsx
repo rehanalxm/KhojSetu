@@ -101,7 +101,7 @@ export default function PostDetailModal({ post, onClose, onContact, onOpenProfil
                     </div>
 
                     <div className="flex items-center gap-2 mb-2">
-                        {post.type === 'LOST' ? (
+                        {post.type?.toUpperCase() === 'LOST' ? (
                             <AlertTriangle className="w-5 h-5 text-red-500" />
                         ) : (
                             <ShieldCheck className="w-5 h-5 text-green-500" />
@@ -164,7 +164,7 @@ export default function PostDetailModal({ post, onClose, onContact, onOpenProfil
                             className="flex-1 bg-gradient-to-r from-primary to-secondary text-white font-bold py-4 rounded-2xl shadow-xl shadow-primary/30 hover:opacity-90 transition flex items-center justify-center gap-2"
                         >
                             <MessageSquare className="w-5 h-5" />
-                            Contact {post.type === 'LOST' ? 'Finder' : 'Owner'}
+                            Contact {post.type?.toUpperCase() === 'LOST' ? 'Finder' : 'Owner'}
                         </button>
                     </div>
                 </div>

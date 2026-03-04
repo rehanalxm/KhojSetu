@@ -117,11 +117,11 @@ export default function MyPostsModal({ onClose, onShowConfirm, onShowToast }: My
                                     <div className="flex-1 min-w-0">
                                         <div className="flex justify-between items-start">
                                             <h3 className="font-semibold text-text truncate pr-2">{post.title}</h3>
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${post.type === 'LOST'
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${post.type?.toUpperCase() === 'LOST'
                                                 ? 'border-red-500/30 text-red-600 dark:text-red-400 bg-red-500/10'
                                                 : 'border-green-500/30 text-green-600 dark:text-green-400 bg-green-500/10'
                                                 }`}>
-                                                {post.type}
+                                                {post.type?.toUpperCase()}
                                             </span>
                                         </div>
                                         <p className="text-xs text-muted truncate mt-0.5">{post.description}</p>
