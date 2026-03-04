@@ -12,10 +12,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Set to false → app uses real Supabase (tables must exist)
 
 
-// Read from env if available, fallback to hardcoded values
-// FORCE: Unconditionally use the hardcoded values to bypass any Vite caching of the old URL
-const supabaseUrl = SUPABASE_URL;
-const supabaseAnonKey = SUPABASE_ANON_KEY;
+// Prefer environment variables, fallback to hardcoded values for maximum reliability
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
 
 // Determine whether to run in mock mode
 // ROBUST CHECK: Fallback to true if env is missing OR if localStorage has a force flag
