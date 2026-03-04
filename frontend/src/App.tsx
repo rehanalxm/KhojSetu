@@ -26,6 +26,9 @@ import type { Post } from './types/categories';
 
 type ViewMode = 'feed' | 'map';
 
+const VERSION = "2.1-SHOWCASE-STABLE";
+console.log(`%c🚀 KHOJSETU ${VERSION} %cInitializing...`, "color: #10b981; font-weight: bold; font-size: 16px;", "color: grey;");
+
 function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('feed');
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
