@@ -40,7 +40,7 @@ export const PostService = {
         try {
             const { data, error } = await supabase
                 .from('posts')
-                .select(`*, profiles:user_id (name)`)
+                .select(`*, profiles!user_id (name)`)
                 .order('created_at', { ascending: false })
                 .limit(50);
 
@@ -209,7 +209,7 @@ export const PostService = {
         try {
             const { data, error } = await supabase
                 .from('posts')
-                .select(`*, profiles:user_id (name)`)
+                .select(`*, profiles!user_id (name)`)
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 

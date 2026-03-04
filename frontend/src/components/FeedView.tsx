@@ -3,6 +3,7 @@ import type { User } from '../types/auth';
 import PostCard from './PostCard';
 import type { Post, CategoryId } from '../types/categories';
 import { PostService } from '../services/PostService';
+import { USE_MOCK, checkConnection } from '../lib/supabase';
 
 interface FeedViewProps {
     onContact: (post: Post) => void;
@@ -36,8 +37,8 @@ export default function FeedView({
         setError(null);
         try {
             // Quick connection check first
-            if (!import.meta.env.VITE_USE_MOCK) {
-                const { connected, error: connError } = await import('../lib/supabase').then(m => m.checkConnection());
+            if (!USE_MOCK) {
+                const { connected, error: connError } = await checkConnection();
                 if (!connected) {
                     throw new Error(`Connection failed: ${connError || 'Unknown error'}`);
                 }
