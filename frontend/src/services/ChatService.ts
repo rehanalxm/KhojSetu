@@ -52,8 +52,8 @@ export const ChatService = {
                     .select(
                         `
                         id, content, created_at, sender_id, receiver_id, post_id,
-                        sender:sender_id (name, avatar_url, email),
-                        receiver:receiver_id (name, avatar_url, email),
+                        sender:profiles!sender_id (name, avatar_url, email),
+                        receiver:profiles!receiver_id (name, avatar_url, email),
                         post:post_id (title, type)
                     `
                     )
@@ -83,8 +83,8 @@ export const ChatService = {
                 conversationsMap.set(conversationKey, {
                     id: conversationKey,
                     participantId,
-                    participantName: participant?.name || 'Unknown',
-                    participantAvatar: participant?.avatar_url || '',
+                    participantName: participant?.name || participant?.email?.split('@')[0] || 'Unknown User',
+                    participantAvatar: participant?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantId}`,
                     participantEmail: participant?.email || '',
                     postId: msg.post_id,
                     postTitle: msg.post?.title || 'Unknown Post',
@@ -136,7 +136,7 @@ export const ChatService = {
         try {
             const { data, error } = await supabase
                 .from('messages')
-                .select(`*, sender:sender_id (name, avatar_url)`)
+                .select(`*, sender:profiles!sender_id (name, avatar_url)`)
                 .eq('post_id', postId)
                 .or(
                     `and(sender_id.eq.${userId},receiver_id.eq.${participantId}),and(sender_id.eq.${participantId},receiver_id.eq.${userId})`
@@ -151,8 +151,8 @@ export const ChatService = {
             return (data || []).map((msg) => ({
                 id: msg.id.toString(),
                 senderId: msg.sender_id,
-                senderName: msg.sender?.name || 'Unknown',
-                senderAvatar: msg.sender?.avatar_url || '',
+                senderName: msg.sender?.name || 'User',
+                senderAvatar: msg.sender?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender_id}`,
                 text: msg.content,
                 timestamp: new Date(msg.created_at),
                 messageType: 'text' as const
@@ -203,7 +203,7 @@ export const ChatService = {
                     post_id: postId,
                     content: text
                 })
-                .select(`*, sender:sender_id (name, avatar_url)`)
+                .select(`*, sender:profiles!sender_id (name, avatar_url)`)
                 .single();
 
             if (error) {
@@ -226,7 +226,7 @@ export const ChatService = {
     },
 
     // ======================== REAL-TIME SUBSCRIPTION ========================
-    subscribeToMessages: (userId: string, onNewMessage: () => void) => {
+    subscribeToMessages: (userId: string, onNewMessage: (payload: any) => void) => {
         if (USE_MOCK) {
             return { unsubscribe: () => { } };
         }
@@ -243,7 +243,7 @@ export const ChatService = {
                 },
                 (payload: any) => {
                     console.log('New message received!', payload);
-                    onNewMessage();
+                    onNewMessage(payload.new);
                 }
             )
             .subscribe();
