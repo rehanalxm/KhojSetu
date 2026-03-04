@@ -18,7 +18,26 @@ const supabaseUrl = SUPABASE_URL;
 const supabaseAnonKey = SUPABASE_ANON_KEY;
 
 // Determine whether to run in mock mode
-export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+// ROBUST CHECK: Fallback to true if env is missing OR if localStorage has a force flag
+const getMockMode = () => {
+    try {
+        const forceMock = localStorage.getItem('khojsetu_force_mock');
+        if (forceMock === 'true') return true;
+        if (forceMock === 'false') return false;
+
+        // Default behavior: check env
+        const envValue = import.meta.env.VITE_USE_MOCK;
+        if (envValue === undefined) {
+            console.warn('VITE_USE_MOCK is undefined, defaulting to MOCK MODE for safety');
+            return true;
+        }
+        return envValue === 'true';
+    } catch {
+        return true;
+    }
+};
+
+export const USE_MOCK = getMockMode();
 
 // Log startup mode clearly
 if (USE_MOCK) {
@@ -56,9 +75,16 @@ export const checkConnection = async (): Promise<{
     }
 
     try {
-        const { error } = await supabase
+        // Add a 5 second timeout to the connection check to prevent infinite hangs
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Connection timed out after 5s')), 5000)
+        );
+
+        const fetchPromise = supabase
             .from('posts')
             .select('count', { count: 'exact', head: true });
+
+        const { error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
         if (error && error.code !== 'PGRST116') {
             console.error('Supabase connection check failed:', error);
@@ -66,6 +92,7 @@ export const checkConnection = async (): Promise<{
         }
         return { connected: true, mode: 'supabase' };
     } catch (e: any) {
+        console.error('Connection health check exception:', e);
         return { connected: false, mode: 'supabase', error: e.message };
     }
 };

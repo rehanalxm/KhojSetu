@@ -160,16 +160,21 @@ function App() {
     setUserPostCount(count);
   };
 
-  const handleLogout = () => {
-    AuthService.logout();
-    setUser(null);
-    setShowProfileMenu(false);
-    setUserPostCount(0);
-    showToast('Logged out successfully', 'success');
-    // Force page reload to clear all state
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 500);
+  const handleLogout = async () => {
+    try {
+      await AuthService.logout();
+      setUser(null);
+      setShowProfileMenu(false);
+      setUserPostCount(0);
+      showToast('Logged out successfully', 'success');
+      // Force page reload after short delay to ensure state is cleared
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 500);
+    } catch (error) {
+      console.error("Logout error:", error);
+      window.location.href = '/'; // Fallback reload
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -185,7 +190,7 @@ function App() {
           setShowProfileMenu(false);
           setUserPostCount(0);
           showToast('Account deleted successfully', 'success');
-          // Force page reload to clear all state
+          // Force page reload after short delay
           setTimeout(() => {
             window.location.href = '/';
           }, 500);

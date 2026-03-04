@@ -292,14 +292,21 @@ export const AuthService = {
 
     // ======================== SESSION / LOGOUT ========================
     logout: async () => {
+        console.log('AuthService: Starting logout process...');
         try {
             if (!USE_MOCK) {
-                await supabase.auth.signOut();
+                // Add a small timeout so logout doesn't hang the UI
+                await Promise.race([
+                    supabase.auth.signOut(),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Logout timeout')), 3000))
+                ]).catch(err => console.warn('AuthService: SignOut warning/timeout:', err));
             }
         } catch (err) {
-            console.warn('Logout warning:', err);
+            console.warn('AuthService: Logout exception:', err);
+        } finally {
+            localStorage.removeItem(STORAGE_KEYS.USER);
+            console.log('AuthService: Local user data cleared.');
         }
-        localStorage.removeItem(STORAGE_KEYS.USER);
     },
 
     async forgotPassword(email: string) {
@@ -323,22 +330,30 @@ export const AuthService = {
         if (USE_MOCK) return AuthService.getCurrentUser();
 
         try {
+            console.log('AuthService: Syncing session...');
             let session = providedSession;
 
             if (!session) {
-                const { data, error } = await supabase.auth.getSession();
-                if (error || !data.session) {
+                // Add timeout to getSession
+                const sessionPromise = supabase.auth.getSession();
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('getSession timeout')), 4000));
+
+                const { data, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
+                if (error || !data?.session) {
+                    console.log('AuthService: No active session found.');
                     localStorage.removeItem(STORAGE_KEYS.USER);
                     return null;
                 }
                 session = data.session;
             }
 
-            if (!session) {
+            if (!session?.user) {
                 localStorage.removeItem(STORAGE_KEYS.USER);
                 return null;
             }
 
+            console.log('AuthService: Fetching profile for sync...');
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('*')
@@ -347,11 +362,14 @@ export const AuthService = {
 
             const user = AuthService._formatUser(session.user, profile);
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+            console.log('AuthService: Sync complete for', user.email);
             return user;
         } catch (err) {
-            console.error('syncSession failed:', err);
-            localStorage.removeItem(STORAGE_KEYS.USER);
-            return null;
+            console.error('AuthService: syncSession failed or timed out:', err);
+            // Don't clear storage on timeout unless we're sure there's no user, 
+            // but for reliability during errors, clearing is safer.
+            // localStorage.removeItem(STORAGE_KEYS.USER);
+            return AuthService.getCurrentUser(); // Return stale local user if we hit a glitch
         }
     },
 

@@ -38,11 +38,17 @@ export const PostService = {
         }
 
         try {
-            const { data, error } = await supabase
+            const fetchPromise = supabase
                 .from('posts')
                 .select(`*, profiles!user_id (name)`)
                 .order('created_at', { ascending: false })
                 .limit(50);
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Fetch timed out after 6s')), 6000)
+            );
+
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
             if (error) {
                 console.error('Error fetching posts:', error);
