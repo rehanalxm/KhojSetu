@@ -96,16 +96,24 @@ export default function FeedView({
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                     </div>
                 ) : error ? (
-                    <div className="text-center py-20">
-                        <div className="text-6xl mb-4">⚠️</div>
-                        <h3 className="text-xl font-bold text-white mb-2">Connection Error</h3>
-                        <p className="text-red-400 mb-6 max-w-md mx-auto">{error}</p>
-                        <button
-                            onClick={loadPosts}
-                            className="px-6 py-2 bg-primary text-white rounded-full hover:bg-opacity-90 transition-all font-medium"
+                    <div className="text-center py-20 px-4">
+                        <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="bg-red-500/10 border border-red-500/20 rounded-3xl p-8 max-w-sm mx-auto backdrop-blur-md"
                         >
-                            Try Again
-                        </button>
+                            <div className="text-5xl mb-6">📡</div>
+                            <h3 className="text-2xl font-bold text-white mb-2">Syncing Data...</h3>
+                            <p className="text-gray-400 mb-8 text-sm leading-relaxed">
+                                We're having trouble reaching the items database. Your connection may be unstable.
+                            </p>
+                            <button
+                                onClick={loadPosts}
+                                className="w-full py-4 bg-gradient-to-r from-primary to-secondary text-white rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all font-bold shadow-lg shadow-primary/20"
+                            >
+                                Reconnect Now
+                            </button>
+                        </motion.div>
                     </div>
                 ) : filteredPosts.length === 0 ? (
                     <div className="text-center py-20">

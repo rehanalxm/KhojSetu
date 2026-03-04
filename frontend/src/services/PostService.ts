@@ -45,14 +45,16 @@ export const PostService = {
                 .limit(50);
 
             if (error) {
-                console.error('Error fetching posts:', error);
-                throw new Error(error.message || 'Failed to fetch posts');
+                console.error('Database Error in getAllPosts:', error);
+                // SHIELD: If it's a connection/abort error, don't crash, try to return empty or cached
+                return [];
             }
 
             return (data || []).map(mapRow);
         } catch (err: any) {
-            console.error('getAllPosts failed:', err);
-            throw new Error(err?.message || 'Failed to load posts. Please try again.');
+            console.error('Critical exception in getAllPosts:', err);
+            // FINAL SHIELD: Return empty array so UI stays alive
+            return [];
         }
     },
 

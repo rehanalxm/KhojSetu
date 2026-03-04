@@ -1,59 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 
 // ---------------------------------------------------------------------------
-// Supabase Configuration
+// Supabase Configuration (LOCKED FOR SHOWCASE)
 // ---------------------------------------------------------------------------
-// Hardcoded credentials (env vars were not loading reliably on this system)
-const SUPABASE_URL = 'https://bbbgcrzlsvjmwjhlzycw.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiYmdjcnpsc3ZqbXdqaGx6eWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NTMzMDYsImV4cCI6MjA4ODEyOTMwNn0.oNooioUEdDTdkDMdXWpFA7gzWuN4T_sDkygcP-dyPzE';
-
-// ---- MOCK MODE TOGGLE ----
-// Set to true  → app uses localStorage (no database needed)
-// Set to false → app uses real Supabase (tables must exist)
-
-
-// Prefer environment variables, fallback to hardcoded values for maximum reliability
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+const LATEST_URL = 'https://bbbgcrzlsvjmwjhlzycw.supabase.co';
+const LATEST_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiYmdjcnpsc3ZqbXdqaGx6eWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NTMzMDYsImV4cCI6MjA4ODEyOTMwNn0.oNooioUEdDTdkDMdXWpFA7gzWuN4T_sDkygcP-dyPzE';
 
 // Determine whether to run in mock mode
-// ROBUST CHECK: Fallback to true if env is missing OR if localStorage has a force flag
 const getMockMode = () => {
     try {
+        // Force Live Mode for showcase unless explicitly overridden in console
         const forceMock = localStorage.getItem('khojsetu_force_mock');
         if (forceMock === 'true') return true;
         if (forceMock === 'false') return false;
 
-        // Default behavior: check env
-        const envValue = import.meta.env.VITE_USE_MOCK;
-        if (envValue === undefined) {
-            console.warn('VITE_USE_MOCK is undefined, defaulting to MOCK MODE for safety');
-            return true;
-        }
-        return envValue === 'true';
+        // Default to Live Mode (false) unless the environment variable is explicitly 'true'
+        return import.meta.env.VITE_USE_MOCK === 'true';
     } catch {
-        return true;
+        return false;
     }
 };
 
 export const USE_MOCK = getMockMode();
 
-// Log startup mode clearly
-if (USE_MOCK) {
-    console.log(
-        '%c🟡 KhojSetu running in MOCK MODE (localStorage)',
-        'color: #f59e0b; font-weight: bold; font-size: 14px;'
-    );
-} else {
-    console.log(
-        '%c🟢 KhojSetu connected to Supabase',
-        'color: #22c55e; font-weight: bold; font-size: 14px;',
-        { url: supabaseUrl.substring(0, 30) + '...' }
-    );
-}
-
-// Create the Supabase client with persistence enabled
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create the Supabase client with FORCED LATEST credentials
+export const supabase = createClient(LATEST_URL, LATEST_KEY, {
     auth: {
         persistSession: true,
         autoRefreshToken: true,
