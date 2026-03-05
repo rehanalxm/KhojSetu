@@ -84,14 +84,25 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
         loadConversations().finally(() => setLoading(false));
 
         // Subscribe to real-time messages
-        const subscription = ChatService.subscribeToMessages(currentUser.id, () => {
+        const subscription = ChatService.subscribeToMessages(currentUser.id, (payload) => {
             loadConversations(); // Reload conversations on new message
+
+            // If the message is for the current active conversation, refresh messages
+            if (activeConversationId && payload) {
+                const activeConv = conversations.find(c => c.id === activeConversationId);
+                // The new message belongs to active conv if (post matches) AND (sender is participant)
+                if (activeConv &&
+                    payload.post_id === activeConv.postId &&
+                    payload.sender_id === activeConv.participantId) {
+                    fetchMessages();
+                }
+            }
         });
 
         return () => {
             subscription.unsubscribe();
         };
-    }, [currentUser?.id]);
+    }, [currentUser?.id, activeConversationId, conversations]);
 
     // Handle "Contact" button click from Feed
     useEffect(() => {
@@ -111,34 +122,34 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
     }, [activeConversationId, messages, input]);
 
     // Load messages when active conversation changes
+    const fetchMessages = async () => {
+        if (!activeConversationId || !currentUser) {
+            setMessages([]);
+            return;
+        }
+
+        const activeConv = conversations.find(c => c.id === activeConversationId);
+        if (!activeConv || activeConversationId.startsWith('temp-')) {
+            setMessages([]); // Don't fetch for temps until real
+            return;
+        }
+
+        setMessagesLoading(true);
+        try {
+            const msgs = await ChatService.getMessages(
+                currentUser.id,
+                activeConv.participantId,
+                activeConv.postId
+            );
+            setMessages(msgs);
+        } catch (error) {
+            console.error("Failed to load messages:", error);
+        } finally {
+            setMessagesLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchMessages = async () => {
-            if (!activeConversationId || !currentUser) {
-                setMessages([]);
-                return;
-            }
-
-            const activeConv = conversations.find(c => c.id === activeConversationId);
-            if (!activeConv || activeConversationId.startsWith('temp-')) {
-                setMessages([]); // Don't fetch for temps until real
-                return;
-            }
-
-            setMessagesLoading(true);
-            try {
-                const msgs = await ChatService.getMessages(
-                    currentUser.id,
-                    activeConv.participantId,
-                    activeConv.postId
-                );
-                setMessages(msgs);
-            } catch (error) {
-                console.error("Failed to load messages:", error);
-            } finally {
-                setMessagesLoading(false);
-            }
-        };
-
         fetchMessages();
     }, [activeConversationId, currentUser?.id]);
 
@@ -219,20 +230,21 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
 
         setSending(true);
         try {
-            await ChatService.sendMessage(
+            const sentMsg = await ChatService.sendMessage(
                 currentUser,
                 activeConv.participantId,
                 activeConv.postId,
                 input.trim()
             );
 
-            setInput("");
-            await loadConversations(); // Refresh to get the new message with correct DB ID
+            if (sentMsg) {
+                setMessages(prev => [...prev, sentMsg]);
+            }
 
-            // If this was a temp conversation, the refresh might populate the REAL conversation.
-            // We need to ensure we switch the active ID to the real one if needed.
+            setInput("");
+            loadConversations(); // Refresh metadata
+
             if (activeConversationId.startsWith('temp-')) {
-                // After reload, find the conversation with same post/participant
                 const updatedConvs = await ChatService.getConversations(currentUser.id);
                 const realConv = updatedConvs.find(c =>
                     c.postId === activeConv.postId && c.participantId === activeConv.participantId
@@ -242,8 +254,9 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                 }
             }
 
-        } catch {
-            console.error('Failed to send message.');
+        } catch (error) {
+            console.error('Failed to send message:', error);
+            onShowAlert?.("Error", "Failed to send message.", "danger");
         } finally {
             setSending(false);
         }

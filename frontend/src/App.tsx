@@ -11,11 +11,12 @@ import ForgotPasswordModal from './components/ForgotPasswordModal';
 import Toast, { type ToastType } from './components/Toast';
 import PostDetailModal from './components/PostDetailModal';
 import UserProfileModal from './components/UserProfileModal';
+import AdminPanel from './components/AdminPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AuthService } from './services/AuthService';
 import { PostService } from './services/PostService';
 import { ChatService } from './services/ChatService';
-import { supabase } from './lib/supabase';
+import { supabase, USE_MOCK } from './lib/supabase';
 import type { User } from './types/auth';
 import Header from './components/Header';
 import type { CategoryId } from './types/categories';
@@ -34,6 +35,9 @@ function App() {
   // New State for My Posts
   const [isMyPostsOpen, setIsMyPostsOpen] = useState(false);
   const [userPostCount, setUserPostCount] = useState(0);
+
+  // Admin State
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
 
   // Alert State
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -85,7 +89,7 @@ function App() {
 
   // Subscribe to real-time messages for notifications
   useEffect(() => {
-    if (!user) return;
+    if (!user || USE_MOCK) return;
 
     const channel = ChatService.subscribeToMessages(user.id, () => {
       setHasUnreadMessages(true);
@@ -93,7 +97,10 @@ function App() {
     });
 
     return () => {
-      channel.unsubscribe();
+      // In mock mode, channel might be a dummy object that doesn't have unsubscribe
+      if (channel && typeof channel.unsubscribe === 'function') {
+        channel.unsubscribe();
+      }
     };
   }, [user]);
 
@@ -101,37 +108,50 @@ function App() {
   useEffect(() => {
     let isInitialSync = true;
 
+    if (USE_MOCK) {
+      // In mock mode, just do an initial sync from localStorage
+      AuthService.syncSession().then(syncedUser => {
+        setUser(syncedUser);
+        if (syncedUser) loadPostCount(syncedUser.id);
+      });
+      return;
+    }
+
     // Listen for Auth Changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Supabase Auth Event:", event);
 
-      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        // Only sync if it's the first time or if the event is strictly after initial sync
-        if (isInitialSync || event !== 'INITIAL_SESSION') {
-          const syncedUser = await AuthService.syncSession();
-          setUser(syncedUser);
-          if (syncedUser) loadPostCount(syncedUser.id);
-          isInitialSync = false;
+      try {
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // Only sync if it's the first time or if the event is strictly after initial sync
+          if (isInitialSync || event !== 'INITIAL_SESSION') {
+            const syncedUser = await AuthService.syncSession(session);
+            setUser(syncedUser);
+            if (syncedUser) loadPostCount(syncedUser.id);
+            isInitialSync = false;
+          }
         }
-      }
 
-      if (event === 'SIGNED_OUT') {
-        setUser(null);
-        localStorage.removeItem('khojsetu_current_user');
-      }
-
-      if (event === 'PASSWORD_RECOVERY') {
-        setForgotPasswordStep(3);
-        setShowForgotPassword(true);
-        setIsAuthModalOpen(false);
-        if (window.location.hash || window.location.search) {
-          window.history.replaceState(null, '', window.location.pathname);
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+          localStorage.removeItem('khojsetu_current_user');
         }
+
+        if (event === 'PASSWORD_RECOVERY') {
+          setForgotPasswordStep(3);
+          setShowForgotPassword(true);
+          setIsAuthModalOpen(false);
+          if (window.location.hash || window.location.search) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+        }
+      } catch (err) {
+        console.error("Critical error inside App.tsx onAuthStateChange:", err);
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) subscription.unsubscribe();
     };
   }, []);
 
@@ -146,6 +166,10 @@ function App() {
     setShowProfileMenu(false);
     setUserPostCount(0);
     showToast('Logged out successfully', 'success');
+    // Force page reload to clear all state
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 500);
   };
 
   const handleDeleteAccount = () => {
@@ -296,7 +320,17 @@ function App() {
                 onShowToast={showToast}
               />
               {/* Footer Integrated here */}
-              <Footer />
+              <Footer onOpenAdmin={() => {
+                console.log("Admin Panel Attempt:", { user, isAdmin: user?.isAdmin });
+                if (user?.isAdmin) {
+                  setIsAdminPanelOpen(true);
+                } else if (!user) {
+                  showToast("Please login first.", "error");
+                  setIsAuthModalOpen(true);
+                } else {
+                  showToast("Admin access required for " + user.email, "error");
+                }
+              }} />
             </motion.div>
           ) : (
             <motion.div
@@ -419,7 +453,7 @@ function App() {
         onClick={handlePostClick}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
-        className="hidden md:block fixed z-[60] 
+        className="hidden md:block fixed z-[60]
                     bottom-8 right-8
                     p-4 bg-gradient-to-tr from-primary to-secondary rounded-full text-white shadow-2xl shadow-primary/50 border-4 border-background"
       >
@@ -504,6 +538,7 @@ function App() {
               <PostItemForm
                 onClose={() => setIsPostFormOpen(false)}
                 onShowAlert={showAlert}
+                currentUser={user}
               />
             </div>
           </motion.div>
@@ -527,10 +562,6 @@ function App() {
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
-          onLogin={(user) => {
-            setUser(user);
-            setIsAuthModalOpen(false);
-          }}
           onForgotPassword={() => {
             setIsAuthModalOpen(false);
             setShowForgotPassword(true);
@@ -611,13 +642,22 @@ function App() {
                 postType: post.type,
                 postImage: post.imageUrl
               });
-                postImage: post.imageUrl,
               setIsChatOpen(true);
             }}
             onOpenPost={(post) => {
               setSelectedUserId(null);
               setSelectedPost(post);
             }}
+          />
+        )}
+
+        {/* Admin Panel */}
+        {isAdminPanelOpen && (
+          <AdminPanel
+            onClose={() => setIsAdminPanelOpen(false)}
+            onShowToast={showToast}
+            onShowConfirm={showConfirm}
+            currentUser={user}
           />
         )}
       </AnimatePresence>

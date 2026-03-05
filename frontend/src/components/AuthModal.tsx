@@ -2,19 +2,19 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Loader2, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { AuthService } from '../services/AuthService';
-import type { User as UserType } from '../types/auth';
+import { USE_MOCK } from '../lib/supabase';
 
 interface AuthModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onLogin: (user: UserType) => void;
     onForgotPassword?: () => void;
 }
 
-export default function AuthModal({ isOpen, onClose, onLogin, onForgotPassword }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onForgotPassword }: AuthModalProps) {
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
     // Form States
@@ -29,17 +29,29 @@ export default function AuthModal({ isOpen, onClose, onLogin, onForgotPassword }
         setLoading(true);
 
         try {
-            let user;
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Login request timed out. Please try again.")), 8000)
+            );
+
             if (isLogin) {
-                user = await AuthService.login(email, password);
+                await Promise.race([AuthService.login(email, password), timeoutPromise]);
             } else {
-                user = await AuthService.signup(name, email, password, gender);
+                await Promise.race([AuthService.signup(name, email, password, gender), timeoutPromise]);
+                if (!USE_MOCK) {
+                    setSuccess('Success! Please check your email to verify your account.');
+                    setLoading(false);
+                    return;
+                }
             }
-            onLogin(user);
+
+            // Wait a tiny bit for App.tsx's onAuthStateChange to fire and update the global state
+            await new Promise(resolve => setTimeout(resolve, 500));
             onClose();
         } catch (err) {
+            console.error('AuthModal error block:', err);
             setError(err instanceof Error ? err.message : 'Authentication failed');
         } finally {
+            console.log('AuthModal: Clearing loading state.');
             setLoading(false);
         }
     };
@@ -106,6 +118,22 @@ export default function AuthModal({ isOpen, onClose, onLogin, onForgotPassword }
                             >
                                 <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium text-center">
                                     {error}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Success Message */}
+                    <AnimatePresence>
+                        {success && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
+                            >
+                                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-medium text-center">
+                                    {success}
                                 </div>
                             </motion.div>
                         )}
