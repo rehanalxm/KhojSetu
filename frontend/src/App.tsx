@@ -147,14 +147,6 @@ function App() {
     setUserPostCount(0);
     showToast('Logged out successfully', 'success');
   };
-    // Force page reload to clear all state
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 500);
-    // Force page reload to clear all state
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 500);
 
   const handleDeleteAccount = () => {
     if (!user) return;
@@ -162,21 +154,17 @@ function App() {
     showConfirm(
       "Delete Account?",
       "Warning: This will permanently delete your account, posts, and messages. This action cannot be undone.",
-          // Force page reload to clear all state
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 500);
       async () => {
         try {
           await AuthService.deleteAccount(user.id);
           setUser(null);
+          setShowProfileMenu(false);
+          setUserPostCount(0);
+          showToast('Account deleted successfully', 'success');
           // Force page reload to clear all state
           setTimeout(() => {
             window.location.href = '/';
           }, 500);
-          setShowProfileMenu(false);
-          setUserPostCount(0);
-          showToast('Account deleted successfully', 'success');
         } catch (error) {
           console.error("Failed to delete account:", error);
           const message = error instanceof Error ? error.message : 'Unknown error';
