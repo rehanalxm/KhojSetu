@@ -36,8 +36,9 @@ export default function FeedView({
         setError(null);
         try {
             // Quick connection check first
-            if (!import.meta.env.VITE_USE_MOCK) {
-                const { connected, error: connError } = await import('../lib/supabase').then(m => m.checkConnection());
+            const { USE_MOCK, checkConnection } = await import('../lib/supabase');
+            if (!USE_MOCK) {
+                const { connected, error: connError } = await checkConnection();
                 if (!connected) {
                     throw new Error(`Connection failed: ${connError || 'Unknown error'}`);
                 }

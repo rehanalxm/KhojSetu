@@ -18,7 +18,7 @@ const supabaseUrl = SUPABASE_URL;
 const supabaseAnonKey = SUPABASE_ANON_KEY;
 
 // Determine whether to run in mock mode
-export const USE_MOCK = false; // SWITCH TO LIVE DATABASE
+export const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'; // SWITCH TO LIVE DATABASE
 
 // Log startup mode clearly
 if (USE_MOCK) {

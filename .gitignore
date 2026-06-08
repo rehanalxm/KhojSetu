@@ -19,6 +19,7 @@ bin/
 .env.test.local
 .env.production.local
 *.env*
+!*.env.example
 
 # IDEs
 .idea/
