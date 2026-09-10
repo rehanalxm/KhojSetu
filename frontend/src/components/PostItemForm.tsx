@@ -123,8 +123,6 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
         setImagePreviews(prev => prev.filter((_, i) => i !== index));
     };
 
-    // Mock Submit
-    // Submit Handler
     // Submit Handler
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();

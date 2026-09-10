@@ -1,7 +1,5 @@
-import { supabase, USE_MOCK } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { Post } from '../types/categories';
-
-const STORAGE_KEY = 'khojsetu_mock_posts';
 
 // ---------------------------------------------------------------------------
 // Helper: map a Supabase row to our Post type
@@ -10,33 +8,70 @@ const mapRow = (p: any): Post => ({
     id: p.id,
     title: p.title,
     description: p.description,
-    type: p.type,
+    type: (p.type || 'lost').toUpperCase() as 'LOST' | 'FOUND',
     category: p.category,
-    imageUrl: p.image_url,
-    imageUrls: p.image_urls || [p.image_url].filter(Boolean),
+    imageUrl: p.image_url || '',
+    imageUrls: p.image_urls || (p.image_url ? [p.image_url] : []),
     location: {
-        lat: p.location_lat,
-        lng: p.location_lng,
-        name: p.location_name
+        lat: p.location_lat || 0,
+        lng: p.location_lng || 0,
+        name: p.location_name || 'Unknown Location'
     },
-    timestamp: new Date(p.created_at),
+    timestamp: new Date(p.created_at || Date.now()),
     userId: p.user_id,
     contactInfo: p.contact_info,
     createdByName: p.profiles?.name
 });
 
 export const PostService = {
-    // ======================== GET ALL POSTS ========================
-    getAllPosts: async (): Promise<Post[]> => {
-        if (USE_MOCK) {
-            console.log('Mock: Fetching all posts');
-            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            return posts.map((p: any) => ({
-                ...p,
-                timestamp: new Date(p.timestamp)
-            }));
+    // ======================== UPLOAD IMAGE ========================
+    uploadImage: async (fileOrDataUrl: string, userId: string): Promise<string> => {
+        if (!fileOrDataUrl || !fileOrDataUrl.startsWith('data:')) {
+            return fileOrDataUrl || '';
         }
 
+        try {
+            // Convert Base64 dataURL to Blob for fast, lightweight storage upload
+            const parts = fileOrDataUrl.split(',');
+            const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+            const ext = mime.split('/')[1] || 'jpg';
+            const bstr = atob(parts[1]);
+            let n = bstr.length;
+            const u8arr = new Uint8Array(n);
+            while (n--) {
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            const blob = new Blob([u8arr], { type: mime });
+
+            const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+            const { data, error } = await supabase.storage
+                .from('khojsetu-images')
+                .upload(fileName, blob, {
+                    contentType: mime,
+                    upsert: true
+                });
+
+            if (!error && data) {
+                const { data: publicUrlData } = supabase.storage
+                    .from('khojsetu-images')
+                    .getPublicUrl(fileName);
+                if (publicUrlData?.publicUrl) {
+                    console.log('Image uploaded to Supabase Storage:', publicUrlData.publicUrl);
+                    return publicUrlData.publicUrl;
+                }
+            } else if (error) {
+                console.warn('Storage bucket upload notice (using compressed fallback):', error.message);
+            }
+        } catch (uploadErr) {
+            console.warn('Upload error, using inline fallback:', uploadErr);
+        }
+
+        return fileOrDataUrl;
+    },
+
+    // ======================== GET ALL POSTS ========================
+    getAllPosts: async (): Promise<Post[]> => {
         try {
             const { data, error } = await supabase
                 .from('posts')
@@ -58,118 +93,94 @@ export const PostService = {
 
     // ======================== CREATE POST ========================
     createPost: async (postData: Omit<Post, 'id' | 'timestamp'>): Promise<Post> => {
-        if (USE_MOCK) {
-            console.log('Mock: Creating post —', postData.title);
-            const newPost: Post = {
-                ...postData,
-                id: Math.floor(Math.random() * 1000000),
-                timestamp: new Date()
-            };
-            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            posts.unshift(newPost);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
-            return newPost;
-        }
-
         try {
-            // Verify active session
-            const {
-                data: { user }
-            } = await supabase.auth.getUser();
-            if (!user) {
-                localStorage.removeItem('khojsetu_current_user');
-                throw new Error('Session expired. Please log in again to post.');
+            // 1. Resolve active user (from session or getUser)
+            const { data: sessionData } = await supabase.auth.getSession();
+            let authUser = sessionData?.session?.user;
+
+            if (!authUser) {
+                const { data: userRes } = await supabase.auth.getUser();
+                authUser = userRes?.user ?? undefined;
             }
 
-            const realUserId = user.id;
+            if (!authUser) {
+                throw new Error('Please login to your account before posting.');
+            }
 
-            // Non-blocking profile sync
-            supabase
+            const realUserId = authUser.id;
+
+            // 2. Upload image to Supabase Storage if present
+            let finalImageUrl = postData.imageUrl || '';
+            if (finalImageUrl && finalImageUrl.startsWith('data:')) {
+                finalImageUrl = await PostService.uploadImage(finalImageUrl, realUserId);
+            }
+
+            // 3. Ensure profile exists in profiles table
+            const profilePayload = {
+                id: realUserId,
+                email: authUser.email || postData.contactInfo || 'user@khojsetu.com',
+                name: postData.createdByName || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+                avatar_url: authUser.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${realUserId}`,
+                updated_at: new Date().toISOString()
+            };
+
+            const { error: profileError } = await supabase
                 .from('profiles')
-                .upsert(
-                    {
-                        id: realUserId,
-                        name:
-                            postData.createdByName ||
-                            user.user_metadata?.name ||
-                            'Anonymous',
-                        email:
-                            realUserId === postData.userId
-                                ? postData.contactInfo
-                                : user.email,
-                        avatar_url:
-                            user.user_metadata?.avatar_url ||
-                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${realUserId}`,
-                        updated_at: new Date().toISOString()
-                    },
-                    { onConflict: 'id' }
-                )
-                .then(({ error: profileError }) => {
-                    if (profileError)
-                        console.warn('Profile sync (non-blocking):', profileError.message);
-                });
+                .upsert(profilePayload, { onConflict: 'id' });
 
-            const { data: insertData, error } = await supabase
+            if (profileError) {
+                console.warn('Profile sync notice:', profileError.message);
+            }
+
+            // 4. Build standard post payload
+            const normalizedType = (postData.type || 'lost').toLowerCase();
+
+            const insertPayload: any = {
+                user_id: realUserId,
+                title: postData.title || 'Untitled Item',
+                description: postData.description || 'No description provided',
+                type: normalizedType,
+                category: postData.category || 'OTHER',
+                image_url: finalImageUrl,
+                contact_info: postData.contactInfo || authUser.email || '',
+                location_lat: postData.location?.lat || 0,
+                location_lng: postData.location?.lng || 0,
+                location_name: postData.location?.name || 'Unknown Location'
+            };
+
+            // 5. Insert Post into Supabase
+            let { data: insertData, error: insertError } = await supabase
                 .from('posts')
-                .insert({
-                    user_id: realUserId,
-                    title: postData.title,
-                    description: postData.description,
-                    type: postData.type,
-                    category: postData.category,
-                    image_url: postData.imageUrl || (postData.imageUrls?.[0] || ''),
-                    image_urls: postData.imageUrls || [postData.imageUrl].filter(Boolean),
-                    contact_info: postData.contactInfo,
-                    location_lat: postData.location.lat,
-                    location_lng: postData.location.lng,
-                    location_name: postData.location.name
-                })
+                .insert(insertPayload)
                 .select()
                 .single();
 
-            if (error) {
-                console.error('Post creation failed:', {
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint,
-                    code: error.code
-                });
-                throw new Error(`Failed to create post: ${error.message}`);
+            // Fallback: If type check constraint requires uppercase ('LOST'/'FOUND')
+            if (insertError && (insertError.message?.includes('type') || insertError.code === '23514')) {
+                insertPayload.type = postData.type?.toUpperCase() || 'LOST';
+                const retryRes = await supabase
+                    .from('posts')
+                    .insert(insertPayload)
+                    .select()
+                    .single();
+                insertData = retryRes.data;
+                insertError = retryRes.error;
             }
 
-            return {
-                id: insertData.id,
-                title: insertData.title,
-                description: insertData.description,
-                type: insertData.type,
-                category: insertData.category,
-                imageUrl: insertData.image_url,
-                imageUrls: insertData.image_urls || [insertData.image_url].filter(Boolean),
-                location: {
-                    lat: insertData.location_lat,
-                    lng: insertData.location_lng,
-                    name: insertData.location_name
-                },
-                timestamp: new Date(insertData.created_at),
-                userId: insertData.user_id,
-                contactInfo: insertData.contact_info
-            };
+            if (insertError) {
+                console.error('Post insertion database error:', insertError);
+                throw new Error(insertError.message || 'Database error while saving post');
+            }
+
+            return mapRow(insertData);
         } catch (err: any) {
-            console.error('createPost failed:', err);
+            console.error('createPost error details:', err);
             throw new Error(err?.message || 'Failed to create post. Please try again.');
         }
     },
 
     // ======================== DELETE POST ========================
-    deletePost: async (postId: number): Promise<void> => {
-        if (USE_MOCK) {
-            console.log('Mock: Deleting post', postId);
-            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            const filtered = posts.filter((p: any) => p.id !== postId);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-            return;
-        }
-
+    deletePost: async (postId: string | number): Promise<void> => {
         try {
             const { error } = await supabase.from('posts').delete().eq('id', postId);
             if (error) throw error;
@@ -180,9 +191,7 @@ export const PostService = {
     },
 
     // ======================== ADMIN DELETE POST ========================
-    adminDeletePost: async (postId: number): Promise<void> => {
-        if (USE_MOCK) return;
-
+    adminDeletePost: async (postId: string | number): Promise<void> => {
         try {
             const { error } = await supabase.from('posts').delete().eq('id', postId);
             if (error) throw error;
@@ -192,20 +201,13 @@ export const PostService = {
         }
     },
 
-    // ======================== SEARCH (placeholder) ========================
+    // ======================== SEARCH ========================
     searchPostsByImage: async (): Promise<Post[]> => {
         return PostService.getAllPosts();
     },
 
     // ======================== GET POSTS BY USER ========================
     getPostsByUser: async (userId: string): Promise<Post[]> => {
-        if (USE_MOCK) {
-            const allPosts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            return allPosts
-                .filter((p: any) => p.userId === userId)
-                .map((p: any) => ({ ...p, timestamp: new Date(p.timestamp) }));
-        }
-
         try {
             const { data, error } = await supabase
                 .from('posts')
@@ -227,11 +229,6 @@ export const PostService = {
 
     // ======================== POST COUNT ========================
     getUserPostCount: async (userId: string): Promise<number> => {
-        if (USE_MOCK) {
-            const posts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            return posts.filter((p: any) => p.userId === userId).length;
-        }
-
         try {
             const { count, error } = await supabase
                 .from('posts')

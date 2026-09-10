@@ -1,9 +1,8 @@
-import { supabase, USE_MOCK } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { User } from '../types/auth';
 
 const STORAGE_KEYS = {
-    USER: 'khojsetu_current_user',
-    ALL_USERS: 'khojsetu_mock_users'
+    USER: 'khojsetu_current_user'
 };
 
 const OTP_STORAGE_KEYS = {
@@ -46,17 +45,11 @@ export const AuthService = {
         password: string,
         gender: 'male' | 'female'
     ): Promise<void> => {
-        // Always persist pending data for later verification
+        // Persist pending data for later verification
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_PASSWORD, password);
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_NAME, name);
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_GENDER, gender);
-
-        if (USE_MOCK) {
-            console.log('Mock: Signup OTP initiated for', email);
-            localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, `mock-otp-${Date.now()}`);
-            return;
-        }
 
         try {
             const { error } = await supabase.auth.signInWithOtp({
@@ -77,24 +70,6 @@ export const AuthService = {
             | 'male'
             | 'female';
         const avatarUrl = `https://api.dicebear.com/7.x/personas/svg?seed=${name}`;
-
-        if (USE_MOCK) {
-            console.log('Mock: OTP verified for', email);
-            const newUser: User = {
-                id: `mock-${Date.now()}`,
-                email,
-                name,
-                avatar: avatarUrl,
-                joinedAt: new Date()
-            };
-
-            const mockUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_USERS) || '[]');
-            mockUsers.push(newUser);
-            localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(mockUsers));
-            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
-            clearPendingOtp();
-            return newUser;
-        }
 
         try {
             const { data, error } = await supabase.auth.verifyOtp({
@@ -132,17 +107,6 @@ export const AuthService = {
 
     // ======================== LOGIN ========================
     login: async (email: string, password: string): Promise<User> => {
-        if (USE_MOCK) {
-            console.log('Mock: Login attempt for', email);
-            const mockUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_USERS) || '[]');
-            const existingUser = mockUsers.find((u: any) => u.email === email);
-            if (!existingUser) {
-                throw new Error('User not found in Mock Mode. Please sign up first.');
-            }
-            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(existingUser));
-            return existingUser;
-        }
-
         try {
             console.log('AuthService.login: Calling signInWithPassword...');
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -153,11 +117,6 @@ export const AuthService = {
                 throw error;
             }
             if (!data.user) throw new Error('Login succeeded but no user returned.');
-
-            console.log('AuthService.login: Success! Passing control to App.tsx auth listener.');
-            // We do NOT fetch the profile here anymore. 
-            // App.tsx's onAuthStateChange('SIGNED_IN') will immediately trigger and call syncSession(),
-            // which handles the profile fetch. Fetching it twice simultaneously causes a deadlock.
 
             return {
                 id: data.user.id,
@@ -179,22 +138,6 @@ export const AuthService = {
         gender: 'male' | 'female'
     ): Promise<User> => {
         const avatarUrl = `https://api.dicebear.com/7.x/personas/svg?seed=${name}`;
-
-        if (USE_MOCK) {
-            console.log('Mock: Signup for', email);
-            const newUser: User = {
-                id: `mock-${Date.now()}`,
-                email,
-                name,
-                avatar: avatarUrl,
-                joinedAt: new Date()
-            };
-            const mockUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_USERS) || '[]');
-            mockUsers.push(newUser);
-            localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(mockUsers));
-            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
-            return newUser;
-        }
 
         try {
             const { data, error } = await supabase.auth.signUp({
@@ -231,12 +174,6 @@ export const AuthService = {
     forgotPasswordInitiate: async (email: string): Promise<void> => {
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
 
-        if (USE_MOCK) {
-            console.log('Mock: Reset OTP initiated for', email);
-            localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, `mock-reset-otp-${Date.now()}`);
-            return;
-        }
-
         try {
             const { error } = await supabase.auth.signInWithOtp({
                 email,
@@ -250,13 +187,6 @@ export const AuthService = {
     },
 
     verifyOtpForPasswordReset: async (email: string, token: string): Promise<string> => {
-        if (USE_MOCK) {
-            console.log('Mock: OTP verified for password reset');
-            const session = `mock-session-${Date.now()}`;
-            localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, session);
-            return session;
-        }
-
         try {
             const { data, error } = await supabase.auth.verifyOtp({
                 email,
@@ -274,12 +204,6 @@ export const AuthService = {
     },
 
     completePasswordReset: async (newPassword: string): Promise<void> => {
-        if (USE_MOCK) {
-            console.log('Mock: Password reset complete');
-            clearPendingOtp();
-            return;
-        }
-
         try {
             const { error } = await supabase.auth.updateUser({ password: newPassword });
             if (error) throw error;
@@ -293,9 +217,7 @@ export const AuthService = {
     // ======================== SESSION / LOGOUT ========================
     logout: async () => {
         try {
-            if (!USE_MOCK) {
-                await supabase.auth.signOut();
-            }
+            await supabase.auth.signOut();
         } catch (err) {
             console.warn('Logout warning:', err);
         }
@@ -303,11 +225,6 @@ export const AuthService = {
     },
 
     async forgotPassword(email: string) {
-        if (USE_MOCK) {
-            console.log('Mock: Password reset email for', email);
-            return;
-        }
-
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: window.location.origin
@@ -320,8 +237,6 @@ export const AuthService = {
     },
 
     async syncSession(providedSession?: any): Promise<User | null> {
-        if (USE_MOCK) return AuthService.getCurrentUser();
-
         try {
             let session = providedSession;
 
@@ -356,11 +271,6 @@ export const AuthService = {
     },
 
     async verifyOtp(email: string, token: string) {
-        if (USE_MOCK) {
-            console.log('Mock: OTP recovery verified');
-            return { user: null, session: null };
-        }
-
         try {
             const { data, error } = await supabase.auth.verifyOtp({
                 email,
@@ -376,11 +286,6 @@ export const AuthService = {
     },
 
     async resetPassword(password: string) {
-        if (USE_MOCK) {
-            console.log('Mock: Password updated');
-            return;
-        }
-
         try {
             const { error } = await supabase.auth.updateUser({ password });
             if (error) throw error;
@@ -394,23 +299,14 @@ export const AuthService = {
     deleteAccount: async (userId: string): Promise<void> => {
         console.log('Starting account deletion for:', userId);
 
-        if (USE_MOCK) {
-            console.log('Mock: Account deleted for', userId);
-            const mockUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.ALL_USERS) || '[]');
-            const filtered = mockUsers.filter((u: any) => u.id !== userId);
-            localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(filtered));
-            localStorage.removeItem(STORAGE_KEYS.USER);
-            return;
-        }
-
         // Delete related data (non-blocking, best-effort)
         try {
             await supabase
-                .from('messages')
+                .from('chats')
                 .delete()
                 .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
         } catch (e) {
-            console.warn('Non-critical: messages deletion error:', e);
+            console.warn('Non-critical: chats deletion error:', e);
         }
 
         try {
@@ -434,11 +330,10 @@ export const AuthService = {
     // ======================== ADMIN DELETE PROFILE ========================
     adminDeleteProfile: async (userId: string): Promise<void> => {
         console.log('Admin deleting account for:', userId);
-        if (USE_MOCK) return;
 
         // Best effort related data deletion
         try {
-            await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+            await supabase.from('chats').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
             await supabase.from('posts').delete().eq('user_id', userId);
         } catch (e) {
             console.warn('Non-critical: cascade deletion error:', e);

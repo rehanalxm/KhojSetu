@@ -75,15 +75,16 @@ export default function Header(props: HeaderProps) {
                         )}
                     </button>
 
-                    {/* Desktop Chat */}
-                    <button
-                        onClick={props.onChatOpen}
-                        className="hidden md:block p-2.5 hover:bg-surface rounded-full transition relative group"
-                        title="Messages"
-                    >
-                        <MessageSquare className="w-5 h-5 text-muted group-hover:text-primary transition" />
-                        {/* Notification Dot Removed */}
-                    </button>
+                    {/* Desktop Chat - Only show when logged in */}
+                    {props.user && (
+                        <button
+                            onClick={props.onChatOpen}
+                            className="hidden md:block p-2.5 hover:bg-surface rounded-full transition relative group"
+                            title="Messages"
+                        >
+                            <MessageSquare className="w-5 h-5 text-muted group-hover:text-primary transition" />
+                        </button>
+                    )}
 
                     {/* Profile */}
                     {props.user ? (

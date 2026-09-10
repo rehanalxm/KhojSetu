@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { User } from '../types/auth';
 import PostCard from './PostCard';
 import type { Post, CategoryId } from '../types/categories';
@@ -30,39 +30,46 @@ export default function FeedView({
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const isMounted = useRef(true);
 
     const loadPosts = async () => {
         setLoading(true);
         setError(null);
         try {
-            // Quick connection check first
-            const { USE_MOCK, checkConnection } = await import('../lib/supabase');
-            if (!USE_MOCK) {
-                const { connected, error: connError } = await checkConnection();
-                if (!connected) {
-                    throw new Error(`Connection failed: ${connError || 'Unknown error'}`);
-                }
-            }
-
             const data = await PostService.getAllPosts();
-            setPosts(data);
+            if (isMounted.current) {
+                setPosts(data);
+            }
         } catch (error: any) {
+            // Ignore AbortError — this happens in React StrictMode during dev
+            if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
+                console.log('Fetch aborted (StrictMode re-mount), ignoring.');
+                return;
+            }
             console.error('Failed to load posts', error);
-            setError(error.message || 'Failed to load posts');
-            onShowToast('Failed to load content. Check connection.', 'error');
+            if (isMounted.current) {
+                setError(error.message || 'Failed to load posts');
+                onShowToast('Failed to load content. Check connection.', 'error');
+            }
         } finally {
-            setLoading(false);
+            if (isMounted.current) {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
+        isMounted.current = true;
         loadPosts();
+        return () => {
+            isMounted.current = false;
+        };
     }, []);
 
-    const handleDelete = (postId: number) => {
+    const handleDelete = (postId: string | number) => {
         onShowConfirm(
             'Delete Post',
-            'Are you sure you want to delete this post?',
+            'Are you sure you want to delete this post? This action cannot be undone.',
             async () => {
                 try {
                     await PostService.deletePost(postId);
@@ -87,8 +94,8 @@ export default function FeedView({
 
     return (
         <div className="bg-background pb-20 md:pb-8">
-            {/* Posts Grid - Removed Search Bar from here */}
-            <div className="max-w-7xl mx-auto px-4 py-6 pt-32 md:pt-40"> {/* Adjusted padding-top to clear the fixed header */}
+            {/* Posts Grid */}
+            <div className="max-w-7xl mx-auto px-4 py-6 pt-32 md:pt-40">
                 {loading ? (
                     <div className="flex justify-center items-center py-20">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -109,7 +116,11 @@ export default function FeedView({
                     <div className="text-center py-20">
                         <div className="text-6xl mb-4">🔍</div>
                         <h3 className="text-xl font-bold text-white mb-2">No posts found</h3>
-                        <p className="text-gray-400">Try adjusting your search or filters</p>
+                        <p className="text-gray-400">
+                            {posts.length === 0
+                                ? 'No items have been posted yet. Be the first to report a lost or found item!'
+                                : 'Try adjusting your search or filters'}
+                        </p>
                     </div>
                 ) : (
                     <>

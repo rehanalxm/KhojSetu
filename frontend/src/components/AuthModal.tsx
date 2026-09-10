@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Loader2, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { AuthService } from '../services/AuthService';
-import { USE_MOCK } from '../lib/supabase';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -37,11 +36,7 @@ export default function AuthModal({ isOpen, onClose, onForgotPassword }: AuthMod
                 await Promise.race([AuthService.login(email, password), timeoutPromise]);
             } else {
                 await Promise.race([AuthService.signup(name, email, password, gender), timeoutPromise]);
-                if (!USE_MOCK) {
-                    setSuccess('Success! Please check your email to verify your account.');
-                    setLoading(false);
-                    return;
-                }
+                setSuccess('Success! Account created.');
             }
 
             // Wait a tiny bit for App.tsx's onAuthStateChange to fire and update the global state

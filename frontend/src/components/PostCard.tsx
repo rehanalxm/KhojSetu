@@ -8,15 +8,17 @@ interface PostCardProps {
     post: Post;
     onClick?: () => void;
     onContact?: (post: Post) => void;
-    onDelete?: (postId: number) => void;
+    onDelete?: (postId: string | number) => void;
     onOpenProfile?: (userId: string) => void;
     currentUser: User | null;
 }
 
 export default function PostCard({ post, onClick, onContact, onDelete, onOpenProfile, currentUser }: PostCardProps) {
     // Check ownership
-    // Use String constraints to ensure loose equality works regardless of number/string types
     const isOwner = currentUser && (String(post.userId) === String(currentUser.id));
+    // Admin can also delete
+    const isAdmin = currentUser?.isAdmin === true;
+    const canDelete = isOwner || isAdmin;
 
     return (
         <motion.div
@@ -28,7 +30,7 @@ export default function PostCard({ post, onClick, onContact, onDelete, onOpenPro
             className="group bg-surface hover:bg-surface/80 border border-border rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 relative flex flex-col h-full"
             onClick={onClick}
         >
-            {/* Image Area - Taller and cleaner */}
+            {/* Image Area */}
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/40">
                 {/* Status & Category Badges (Floating) */}
                 <div className="absolute top-4 left-4 z-10 flex gap-2">
@@ -111,7 +113,7 @@ export default function PostCard({ post, onClick, onContact, onDelete, onOpenPro
                         </button>
                     )}
 
-                    {isOwner && onDelete && (
+                    {canDelete && onDelete && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();

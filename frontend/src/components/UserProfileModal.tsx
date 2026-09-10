@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Calendar, Mail, MapPin, Grid3x3, Loader2, MessageSquare, Award } from 'lucide-react';
 import type { Post } from '../types/categories';
 import { PostService } from '../services/PostService';
-import { supabase, USE_MOCK } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 
 interface UserProfileModalProps {
     userId: string;
@@ -32,35 +32,12 @@ export default function UserProfileModal({ userId, onClose, onContact, onOpenPos
             try {
                 // Fetch Profile
                 let userProfile: UserProfile | null = null;
-                if (USE_MOCK) {
-                    const mockUsers = JSON.parse(localStorage.getItem('khojsetu_mock_users') || '[]');
-                    const found = mockUsers.find((u: any) => u.id === userId);
-                    if (found) {
-                        userProfile = {
-                            id: found.id,
-                            name: found.name,
-                            avatar_url: found.avatar,
-                            email: found.email,
-                            created_at: found.joinedAt
-                        };
-                    } else {
-                        // Fallback/Placeholder for mock if not found
-                        userProfile = {
-                            id: userId,
-                            name: 'User ' + userId.slice(0, 5),
-                            avatar_url: `https://api.dicebear.com/7.x/personas/svg?seed=${userId}`,
-                            email: 'user@example.com',
-                            created_at: new Date(Date.now() - 10000000).toISOString()
-                        };
-                    }
-                } else {
-                    const { data, error } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', userId)
-                        .single();
-                    if (!error) userProfile = data;
-                }
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+                if (!error) userProfile = data;
                 setProfile(userProfile);
 
                 // Fetch Posts (Optimized: only for this user)

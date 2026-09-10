@@ -80,29 +80,29 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
     useEffect(() => {
         if (!currentUser) return;
 
-        setLoading(true);
-        loadConversations().finally(() => setLoading(false));
+        let isMounted = true;
+
+        const doLoad = async () => {
+            setLoading(true);
+            try {
+                await loadConversations();
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        doLoad();
 
         // Subscribe to real-time messages
-        const subscription = ChatService.subscribeToMessages(currentUser.id, (payload) => {
+        const subscription = ChatService.subscribeToMessages(currentUser.id, () => {
             loadConversations(); // Reload conversations on new message
-
-            // If the message is for the current active conversation, refresh messages
-            if (activeConversationId && payload) {
-                const activeConv = conversations.find(c => c.id === activeConversationId);
-                // The new message belongs to active conv if (post matches) AND (sender is participant)
-                if (activeConv &&
-                    payload.post_id === activeConv.postId &&
-                    payload.sender_id === activeConv.participantId) {
-                    fetchMessages();
-                }
-            }
         });
 
         return () => {
+            isMounted = false;
             subscription.unsubscribe();
         };
-    }, [currentUser?.id, activeConversationId, conversations]);
+    }, [currentUser?.id]);
 
     // Handle "Contact" button click from Feed
     useEffect(() => {

@@ -1,16 +1,22 @@
 version: '3.8'
 
 services:
-  db:
-    image: mongo:latest
-    container_name: khojsetu_db
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: pcrehan001_db_user
-      MONGO_INITDB_ROOT_PASSWORD: 27KKDyGdFwVSfOf6
+  ai-service:
+    build: ./ai-service
+    container_name: khojsetu_ai_service
     ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
+      - "8000:8000"
+    restart: unless-stopped
 
-volumes:
-  mongo_data:
+  frontend:
+    build: ./frontend
+    container_name: khojsetu_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - VITE_AI_SERVICE_URL=http://ai-service:8000
+    depends_on:
+      - ai-service
+    restart: unless-stopped

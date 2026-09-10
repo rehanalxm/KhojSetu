@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AuthService } from './services/AuthService';
 import { PostService } from './services/PostService';
 import { ChatService } from './services/ChatService';
-import { supabase, USE_MOCK } from './lib/supabase';
+import { supabase } from './lib/supabase';
 import type { User } from './types/auth';
 import Header from './components/Header';
 import type { CategoryId } from './types/categories';
@@ -89,7 +89,7 @@ function App() {
 
   // Subscribe to real-time messages for notifications
   useEffect(() => {
-    if (!user || USE_MOCK) return;
+    if (!user) return;
 
     const channel = ChatService.subscribeToMessages(user.id, () => {
       setHasUnreadMessages(true);
@@ -97,7 +97,6 @@ function App() {
     });
 
     return () => {
-      // In mock mode, channel might be a dummy object that doesn't have unsubscribe
       if (channel && typeof channel.unsubscribe === 'function') {
         channel.unsubscribe();
       }
@@ -107,15 +106,6 @@ function App() {
   // Centralized Auth & Session Management
   useEffect(() => {
     let isInitialSync = true;
-
-    if (USE_MOCK) {
-      // In mock mode, just do an initial sync from localStorage
-      AuthService.syncSession().then(syncedUser => {
-        setUser(syncedUser);
-        if (syncedUser) loadPostCount(syncedUser.id);
-      });
-      return;
-    }
 
     // Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -160,16 +150,26 @@ function App() {
     setUserPostCount(count);
   };
 
-  const handleLogout = () => {
-    AuthService.logout();
-    setUser(null);
+  const handleLogout = async () => {
     setShowProfileMenu(false);
+    setUser(null);
     setUserPostCount(0);
+    try {
+      await AuthService.logout();
+    } catch (err) {
+      console.warn('Logout error:', err);
+    }
+    // Clear all KhojSetu localStorage keys to prevent stale data
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('khojsetu_')) {
+        localStorage.removeItem(key);
+      }
+    });
     showToast('Logged out successfully', 'success');
     // Force page reload to clear all state
     setTimeout(() => {
       window.location.href = '/';
-    }, 500);
+    }, 300);
   };
 
   const handleDeleteAccount = () => {
@@ -418,21 +418,31 @@ function App() {
             </motion.button>
           </div>
 
-          <button
-            onClick={() => {
-              setIsChatOpen(true);
-              setHasUnreadMessages(false); // Clear notification on open
-            }}
-            className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all text-gray-400 hover:text-white"
-          >
-            <div className="relative">
+          {user ? (
+            <button
+              onClick={() => {
+                setIsChatOpen(true);
+                setHasUnreadMessages(false);
+              }}
+              className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all text-gray-400 hover:text-white"
+            >
+              <div className="relative">
+                <MessageSquare className="w-6 h-6" />
+                {hasUnreadMessages && (
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-surface animate-pulse"></span>
+                )}
+              </div>
+              <span className="text-[10px] font-medium">Chat</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all text-gray-400 hover:text-white"
+            >
               <MessageSquare className="w-6 h-6" />
-              {hasUnreadMessages && (
-                <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-surface animate-pulse"></span>
-              )}
-            </div>
-            <span className="text-[10px] font-medium">Chat</span>
-          </button>
+              <span className="text-[10px] font-medium">Chat</span>
+            </button>
+          )}
 
           <button
             onClick={() => user ? setShowProfileMenu(!showProfileMenu) : setIsAuthModalOpen(true)}

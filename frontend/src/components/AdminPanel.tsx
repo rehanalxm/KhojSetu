@@ -19,10 +19,6 @@ export default function AdminPanel({ onClose, onShowToast, onShowConfirm, curren
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Local mock state for users since we don't have a public get-all-users route easily available for mock mode
-    // In a real app with Supabase, you would create an admin RPC function to get users. For this showcase, 
-    // we'll rely on the posts data to find unique users, or a specialized RPC if needed. 
-    // Since we need to delete fake IDs, let's load all posts and extract unique users from there for the UI.
     const [users, setUsers] = useState<{ id: string, name: string }[]>([]);
 
     useEffect(() => {
@@ -42,19 +38,10 @@ export default function AdminPanel({ onClose, onShowToast, onShowConfirm, curren
                 const allPosts = await PostService.getAllPosts();
                 setPosts(allPosts);
             } else if (activeTab === 'users') {
-                // In a perfect world, we'd query `public.profiles`. Since we don't have a service method 
-                // for fetching all profiles setup yet, let's extract users from our posts as a lightweight solution
-                // OR we can make a direct supabase call here if USE_MOCK is false.
-                const { supabase, USE_MOCK } = await import('../lib/supabase');
-                if (!USE_MOCK) {
-                    const { data, error } = await supabase.from('profiles').select('id, name, email');
-                    if (!error && data) {
-                        setUsers(data as any);
-                    }
-                } else {
-                    // Mock fallback
-                    const mockUsers = JSON.parse(localStorage.getItem('khojsetu_mock_users') || '[]');
-                    setUsers(mockUsers);
+                const { supabase } = await import('../lib/supabase');
+                const { data, error } = await supabase.from('profiles').select('id, name, email');
+                if (!error && data) {
+                    setUsers(data as any);
                 }
             }
         } catch (error) {
@@ -225,7 +212,7 @@ export default function AdminPanel({ onClose, onShowToast, onShowConfirm, curren
                                             title="Delete User and all related data"
                                         >
                                             <Trash2 className="w-3 h-3" />
-                                            Remove Fake ID
+                                            Remove User
                                         </button>
                                     </motion.div>
                                 ))}
