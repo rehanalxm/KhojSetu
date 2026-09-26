@@ -47,6 +47,7 @@ function App() {
     type: DialogType;
     confirmText?: string;
     cancelText?: string;
+    requireInputText?: string;
     onConfirm: () => void;
   }>({
     isOpen: false,
@@ -55,6 +56,7 @@ function App() {
     type: 'confirm',
     confirmText: 'Confirm',
     cancelText: 'Cancel',
+    requireInputText: undefined,
     onConfirm: () => { },
   });
 
@@ -176,8 +178,8 @@ function App() {
     if (!user) return;
 
     showConfirm(
-      "Delete Account?",
-      "Warning: This will permanently delete your account, posts, and messages. This action cannot be undone.",
+      "Delete Account Permanently?",
+      "Warning: This will permanently delete your account, posts, and messages from the database. This action cannot be undone.",
       async () => {
         try {
           await AuthService.deleteAccount(user.id);
@@ -196,18 +198,27 @@ function App() {
         }
       },
       "danger",
-      "Delete Forever"
+      "Delete Forever",
+      "DELETE MY ACCOUNT"
     );
   };
 
   // Alert Helpers
-  const showConfirm = (title: string, message: string, onConfirm: () => void, type: DialogType = 'confirm', confirmText?: string) => {
+  const showConfirm = (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    type: DialogType = 'confirm',
+    confirmText?: string,
+    requireInputText?: string
+  ) => {
     setConfirmDialog({
       isOpen: true,
       title,
       message,
       type,
       confirmText,
+      requireInputText,
       onConfirm: () => {
         onConfirm();
         setConfirmDialog(prev => ({ ...prev, isOpen: false }));
@@ -671,6 +682,27 @@ function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Confirm & Alert Dialog */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        type={confirmDialog.type}
+        confirmText={confirmDialog.confirmText}
+        cancelText={confirmDialog.cancelText}
+        requireInputText={confirmDialog.requireInputText}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* Global Toast */}
+      <Toast
+        isVisible={toast.isVisible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast(prev => ({ ...prev, isVisible: false }))}
+      />
     </div>
   );
 }

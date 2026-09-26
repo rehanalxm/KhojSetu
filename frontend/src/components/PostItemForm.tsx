@@ -34,22 +34,14 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
     const handleUseCurrentLocation = async () => {
         getCurrentLocation();
         setLocationName('Fetching location...');
-
-        // We'll wait for the userLocation to update in the next effect or monitor it here
     };
 
-    // New effect to handle reverse geocoding when coordinates are fetched
     useEffect(() => {
         const fetchAddress = async () => {
             if (userLocation.coordinates && (locationName === 'Fetching location...' || !locationName)) {
                 setGeocoding(true);
                 const data = await reverseGeocode(userLocation.coordinates.lat, userLocation.coordinates.lng);
                 if (data) {
-                    // Find the inputs and set their values if possible, 
-                    // or use state if we refactor to controlled components.
-                    // For now, we'll try to find them in the DOM to avoid huge refactor, 
-                    // or just update locationName.
-
                     const countryInput = document.querySelector('input[name="country"]') as HTMLInputElement;
                     const stateInput = document.querySelector('input[name="state"]') as HTMLInputElement;
                     const cityInput = document.querySelector('input[name="city"]') as HTMLInputElement;
@@ -70,55 +62,52 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
         fetchAddress();
     }, [userLocation.coordinates, reverseGeocode]);
 
-    const resizeImage = (base64Str: string, maxWidth = 800, maxHeight = 800): Promise<string> => {
+    const compressImage = (file: File): Promise<string> => {
         return new Promise((resolve) => {
-            const img = new Image();
-            img.src = base64Str;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > maxWidth) {
-                        height *= maxWidth / width;
-                        width = maxWidth;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let { width, height } = img;
+                    const maxDim = 600;
+                    if (width > height) {
+                        if (width > maxDim) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        }
+                    } else {
+                        if (height > maxDim) {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
                     }
-                } else {
-                    if (height > maxHeight) {
-                        width *= maxHeight / height;
-                        height = maxHeight;
-                    }
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx?.drawImage(img, 0, 0, width, height);
-                resolve(canvas.toDataURL('image/jpeg', 0.6)); // Aggressive 0.6 quality
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.5));
+                };
+                img.onerror = () => resolve((e.target?.result as string) || '');
+                img.src = (e.target?.result as string) || '';
             };
-            img.onerror = () => {
-                resolve(base64Str);
-            };
+            reader.onerror = () => resolve('');
+            reader.readAsDataURL(file);
         });
     };
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length > 0) {
             const remaining = 3 - imagePreviews.length;
             const toAdd = files.slice(0, remaining);
 
-            toAdd.forEach(file => {
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                    const original = reader.result as string;
-                    // Resize before adding to state
-                    const resized = await resizeImage(original);
-                    setImagePreviews(prev => [...prev, resized].slice(0, 3));
-                };
-                reader.readAsDataURL(file);
-            });
+            for (const file of toAdd) {
+                const compressed = await compressImage(file);
+                if (compressed) {
+                    setImagePreviews(prev => [...prev, compressed].slice(0, 3));
+                }
+            }
         }
     };
 
@@ -157,8 +146,8 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
                 description: description || 'No description provided',
                 type: type,
                 category,
-                imageUrl: imagePreviews[0] || '', // Primary image
-                imageUrls: imagePreviews, // All images
+                imageUrl: imagePreviews[0] || '',
+                imageUrls: imagePreviews,
                 location: {
                     lat: userLocation.coordinates?.lat || 0,
                     lng: userLocation.coordinates?.lng || 0,
@@ -172,8 +161,6 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
             // Success
             setLoading(false);
             onClose();
-            // Trigger reload to show new post
-            window.location.reload();
         } catch (err) {
             console.error(err);
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -373,12 +360,12 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
                         {/* Image Upload */}
                         <div>
                             <label className="block text-sm font-semibold text-text mb-2">
-                                Photos ({imagePreviews.length}/3) *
+                                Photos ({imagePreviews.length}/3)
                             </label>
 
                             {/* Grid of Previews */}
                             {imagePreviews.length > 0 && (
-                                <div className="grid grid-cols-3 gap-3 mb-4">
+                                <div className="grid grid-cols-3 gap-3 mb-3">
                                     {imagePreviews.map((preview, index) => (
                                         <div key={index} className="relative aspect-square border-2 border-primary/30 rounded-xl overflow-hidden group">
                                             <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover" />
@@ -414,15 +401,14 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
                                         multiple
                                         onChange={handleImageChange}
                                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                        required
                                         id="gallery-input"
                                     />
-                                    <div className="border-2 border-dashed border-red-500/30 rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer group bg-red-500/5">
+                                    <div className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center text-center hover:border-primary/50 hover:bg-black/5 dark:hover:bg-white/5 transition cursor-pointer group">
                                         <div className="p-3 bg-black/5 dark:bg-white/5 rounded-full mb-3 group-hover:scale-110 group-hover:bg-primary/20 transition">
                                             <ImageIcon className="w-6 h-6 text-muted group-hover:text-primary transition" />
                                         </div>
                                         <p className="text-sm font-medium text-text">Choose from Gallery</p>
-                                        <p className="text-xs text-red-500 dark:text-red-400 mt-1">Upload up to 3 photos</p>
+                                        <p className="text-xs text-muted mt-1">Upload up to 3 photos (optional)</p>
                                     </div>
                                 </div>
                             )}
