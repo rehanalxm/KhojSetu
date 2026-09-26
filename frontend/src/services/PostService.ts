@@ -56,7 +56,20 @@ const createTinyThumbnail = (base64Str: string, maxDim = 400, quality = 0.4): Pr
     });
 };
 
+// ---------------------------------------------------------------------------
+// Intelligent In-Memory & Session Cache Layer (0ms Instant Load)
+// ---------------------------------------------------------------------------
+let postsCache: Post[] | null = null;
+let lastCacheTimestamp = 0;
+const CACHE_TTL_MS = 60 * 1000; // 1 minute auto-refresh or real-time event-driven
+
 export const PostService = {
+    // Invalidate or clear cache
+    invalidateCache: () => {
+        postsCache = null;
+        lastCacheTimestamp = 0;
+    },
+
     // ======================== UPLOAD IMAGE ========================
     uploadImage: async (fileOrDataUrl: string, userId: string): Promise<string> => {
         if (!fileOrDataUrl || !fileOrDataUrl.startsWith('data:')) {
@@ -79,12 +92,19 @@ export const PostService = {
             const cleanUserId = userId || 'user';
             const fileName = `${cleanUserId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
-            const { data, error } = await supabase.storage
+            // Fast 5-second timeout on storage upload
+            const uploadPromise = supabase.storage
                 .from('khojsetu-images')
                 .upload(fileName, blob, {
                     contentType: mime,
                     upsert: true
                 });
+
+            const timeoutPromise = new Promise<any>((_, reject) =>
+                setTimeout(() => reject(new Error('Storage timeout')), 5000)
+            );
+
+            const { data, error } = await Promise.race([uploadPromise, timeoutPromise]);
 
             if (!error && data) {
                 const { data: publicUrlData } = supabase.storage
@@ -95,31 +115,48 @@ export const PostService = {
                 }
             }
         } catch (uploadErr) {
-            console.warn('Storage upload notice, optimizing thumbnail fallback:', uploadErr);
+            console.warn('Storage upload notice, using optimized thumbnail:', uploadErr);
         }
 
         // Fallback: compress to ultra-lightweight thumbnail so JSON insert is under 20KB
         return await createTinyThumbnail(fileOrDataUrl, 400, 0.4);
     },
 
-    // ======================== GET ALL POSTS ========================
-    getAllPosts: async (): Promise<Post[]> => {
+    // ======================== GET ALL POSTS (With Intelligent Cache) ========================
+    getAllPosts: async (forceRefresh = false): Promise<Post[]> => {
+        const now = Date.now();
+
+        // 1. Instant Cache Return (0ms loading, zero delay)
+        if (!forceRefresh && postsCache !== null && (now - lastCacheTimestamp < CACHE_TTL_MS)) {
+            return postsCache;
+        }
+
         try {
-            const { data, error } = await supabase
+            // 2. Fast fetch from Supabase with 4-second safety timeout
+            const fetchPromise = supabase
                 .from('posts')
                 .select(`*, profiles:user_id (name)`)
                 .order('created_at', { ascending: false })
                 .limit(100);
 
+            const timeoutPromise = new Promise<any>((_, reject) =>
+                setTimeout(() => reject(new Error('Fetch timeout')), 4000)
+            );
+
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
             if (error) {
-                console.error('Error fetching posts:', error);
-                throw new Error(error.message || 'Failed to fetch posts');
+                console.warn('Error fetching posts:', error.message);
+                return postsCache || [];
             }
 
-            return (data || []).map(mapRow);
+            const formatted = (data || []).map(mapRow);
+            postsCache = formatted;
+            lastCacheTimestamp = Date.now();
+            return formatted;
         } catch (err: any) {
-            console.error('getAllPosts failed:', err);
-            throw new Error(err?.message || 'Failed to load posts. Please check connection.');
+            console.warn('getAllPosts notice:', err?.message);
+            return postsCache || [];
         }
     },
 
@@ -135,6 +172,8 @@ export const PostService = {
                     table: 'posts'
                 },
                 () => {
+                    // Invalidate cache immediately on real-time event
+                    PostService.invalidateCache();
                     onPostsChange();
                 }
             )
@@ -210,7 +249,15 @@ export const PostService = {
                 throw new Error(insertError.message || 'Database error while saving post');
             }
 
-            return mapRow(insertData);
+            const newPost = mapRow(insertData);
+
+            // Optimistic in-memory cache update
+            if (postsCache) {
+                postsCache = [newPost, ...postsCache.filter(p => p.id !== newPost.id)];
+            }
+            lastCacheTimestamp = Date.now();
+
+            return newPost;
         } catch (err: any) {
             console.error('createPost error details:', err);
             const msg = err?.message || '';
@@ -226,6 +273,11 @@ export const PostService = {
         try {
             const { error } = await supabase.from('posts').delete().eq('id', postId);
             if (error) throw error;
+
+            // Optimistic in-memory cache update
+            if (postsCache) {
+                postsCache = postsCache.filter(p => p.id !== postId);
+            }
         } catch (err: any) {
             console.error('deletePost failed:', err);
             throw new Error(err?.message || 'Failed to delete post.');
@@ -237,6 +289,10 @@ export const PostService = {
         try {
             const { error } = await supabase.from('posts').delete().eq('id', postId);
             if (error) throw error;
+
+            if (postsCache) {
+                postsCache = postsCache.filter(p => p.id !== postId);
+            }
         } catch (err: any) {
             console.error('adminDeletePost failed:', err);
             throw new Error(err?.message || 'Failed to delete post as admin.');
