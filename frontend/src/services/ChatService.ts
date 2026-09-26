@@ -32,10 +32,10 @@ export interface ChatConversation {
     unreadCount: number;
 }
 
-
 export const ChatService = {
     // ======================== GET CONVERSATIONS ========================
     getConversations: async (userId: string): Promise<ChatConversation[]> => {
+        if (!userId) return [];
         let messages: any[] = [];
 
         try {
@@ -53,7 +53,7 @@ export const ChatService = {
                 .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
                 .order('created_at', { ascending: false });
 
-            // If 'messages' failed, fallback try 'chats'
+            // If 'messages' failed, fallback to 'chats'
             if (res.error) {
                 res = await supabase
                     .from('chats')
@@ -85,22 +85,22 @@ export const ChatService = {
             const isSender = msg.sender_id === userId;
             const participantId = isSender ? msg.receiver_id : msg.sender_id;
             const participant = isSender ? msg.receiver : msg.sender;
-            const conversationKey = `${msg.post_id}_${participantId}`;
+            const conversationKey = `${msg.post_id || 'general'}_${participantId}`;
 
             if (!conversationsMap.has(conversationKey)) {
                 conversationsMap.set(conversationKey, {
                     id: conversationKey,
                     participantId,
-                    participantName: participant?.name || participant?.email?.split('@')[0] || 'Unknown User',
+                    participantName: participant?.name || participant?.email?.split('@')[0] || 'User',
                     participantAvatar: participant?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantId}`,
                     participantEmail: participant?.email || '',
-                    postId: msg.post_id,
+                    postId: msg.post_id || '',
                     postTitle: msg.post?.title || 'Item Discussion',
                     postType: (msg.post?.type || 'LOST').toUpperCase() as 'LOST' | 'FOUND',
                     messages: [],
-                    createdAt: new Date(msg.created_at),
-                    lastMessageAt: new Date(msg.created_at),
-                    lastMessage: msg.content,
+                    createdAt: new Date(msg.created_at || Date.now()),
+                    lastMessageAt: new Date(msg.created_at || Date.now()),
+                    lastMessage: msg.content || '',
                     unreadCount: 0
                 });
             }
@@ -117,25 +117,31 @@ export const ChatService = {
         participantId: string,
         postId: string | number
     ): Promise<ChatMessage[]> => {
+        if (!userId || !participantId) return [];
+
         try {
-            let res = await supabase
+            let query = supabase
                 .from('messages')
                 .select(`*, sender:profiles!sender_id (name, avatar_url)`)
-                .eq('post_id', postId)
                 .or(
                     `and(sender_id.eq.${userId},receiver_id.eq.${participantId}),and(sender_id.eq.${participantId},receiver_id.eq.${userId})`
-                )
-                .order('created_at', { ascending: true });
+                );
+
+            if (postId) {
+                query = query.eq('post_id', postId);
+            }
+
+            let res = await query.order('created_at', { ascending: true });
 
             if (res.error) {
-                res = await supabase
+                let fallbackQuery = supabase
                     .from('chats')
                     .select(`*, sender:profiles!sender_id (name, avatar_url)`)
-                    .eq('post_id', postId)
                     .or(
                         `and(sender_id.eq.${userId},receiver_id.eq.${participantId}),and(sender_id.eq.${participantId},receiver_id.eq.${userId})`
-                    )
-                    .order('created_at', { ascending: true });
+                    );
+                if (postId) fallbackQuery = fallbackQuery.eq('post_id', postId);
+                res = await fallbackQuery.order('created_at', { ascending: true });
             }
 
             if (res.error) {
@@ -149,7 +155,7 @@ export const ChatService = {
                 senderName: msg.sender?.name || 'User',
                 senderAvatar: msg.sender?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender_id}`,
                 text: msg.content,
-                timestamp: new Date(msg.created_at),
+                timestamp: new Date(msg.created_at || Date.now()),
                 messageType: 'text' as const
             }));
         } catch (err: any) {
@@ -166,12 +172,15 @@ export const ChatService = {
         text: string
     ): Promise<ChatMessage | null> => {
         try {
-            const insertPayload = {
+            const insertPayload: any = {
                 sender_id: currentUser.id,
                 receiver_id: participantId,
-                post_id: postId,
                 content: text
             };
+
+            if (postId) {
+                insertPayload.post_id = postId;
+            }
 
             let res = await supabase
                 .from('messages')
@@ -199,7 +208,7 @@ export const ChatService = {
                 senderName: data.sender?.name || currentUser.name,
                 senderAvatar: data.sender?.avatar_url || currentUser.avatar,
                 text: data.content,
-                timestamp: new Date(data.created_at)
+                timestamp: new Date(data.created_at || Date.now())
             };
         } catch (err: any) {
             console.error('sendMessage failed:', err);
@@ -210,18 +219,19 @@ export const ChatService = {
     // ======================== REAL-TIME SUBSCRIPTION ========================
     subscribeToMessages: (userId: string, onNewMessage: (payload: any) => void) => {
         return supabase
-            .channel('public:messages')
+            .channel(`public:messages:${userId}`)
             .on(
                 'postgres_changes',
                 {
                     event: 'INSERT',
                     schema: 'public',
-                    table: 'messages',
-                    filter: `receiver_id=eq.${userId}`
+                    table: 'messages'
                 },
                 (payload: any) => {
-                    console.log('New message received!', payload);
-                    onNewMessage(payload.new);
+                    const newMsg = payload.new;
+                    if (newMsg && (newMsg.receiver_id === userId || newMsg.sender_id === userId)) {
+                        onNewMessage(newMsg);
+                    }
                 }
             )
             .subscribe();
@@ -234,21 +244,17 @@ export const ChatService = {
         postId: string | number
     ) => {
         try {
-            const filterMatch = { post_id: postId };
             const filterOr = `and(sender_id.eq.${currentUserId},receiver_id.eq.${participantId}),and(sender_id.eq.${participantId},receiver_id.eq.${currentUserId})`;
 
-            let res = await supabase
-                .from('messages')
-                .delete()
-                .match(filterMatch)
-                .or(filterOr);
+            let query = supabase.from('messages').delete().or(filterOr);
+            if (postId) query = query.eq('post_id', postId);
+
+            let res = await query;
 
             if (res.error) {
-                res = await supabase
-                    .from('chats')
-                    .delete()
-                    .match(filterMatch)
-                    .or(filterOr);
+                let fallbackQuery = supabase.from('chats').delete().or(filterOr);
+                if (postId) fallbackQuery = fallbackQuery.eq('post_id', postId);
+                res = await fallbackQuery;
             }
 
             if (res.error) {

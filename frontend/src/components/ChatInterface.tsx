@@ -76,6 +76,9 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
         );
     };
 
+    const activeConversationIdRef = useRef<string | null>(null);
+    activeConversationIdRef.current = activeConversationId;
+
     // Initial Load & Realtime Subscription
     useEffect(() => {
         if (!currentUser) return;
@@ -95,12 +98,17 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
 
         // Subscribe to real-time messages
         const subscription = ChatService.subscribeToMessages(currentUser.id, () => {
-            loadConversations(); // Reload conversations on new message
+            loadConversations();
+            if (activeConversationIdRef.current) {
+                fetchMessages();
+            }
         });
 
         return () => {
             isMounted = false;
-            subscription.unsubscribe();
+            if (subscription && typeof subscription.unsubscribe === 'function') {
+                subscription.unsubscribe();
+            }
         };
     }, [currentUser?.id]);
 

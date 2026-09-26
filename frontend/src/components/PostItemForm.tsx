@@ -97,6 +97,9 @@ export default function PostItemForm({ onClose, onShowAlert, currentUser: propUs
                 ctx?.drawImage(img, 0, 0, width, height);
                 resolve(canvas.toDataURL('image/jpeg', 0.6)); // Aggressive 0.6 quality
             };
+            img.onerror = () => {
+                resolve(base64Str);
+            };
         });
     };
 

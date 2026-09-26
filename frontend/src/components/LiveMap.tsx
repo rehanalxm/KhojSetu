@@ -96,11 +96,27 @@ export default function LiveMap({ currentUser, onContact, onDelete, onOpenDetail
     const [posts, setPosts] = useState<Post[]>([]);
 
     useEffect(() => {
+        let isMounted = true;
         const loadPosts = async () => {
-            const allPosts = await PostService.getAllPosts();
-            setPosts(allPosts);
+            try {
+                const allPosts = await PostService.getAllPosts();
+                if (isMounted) setPosts(allPosts);
+            } catch (err) {
+                console.warn('Map posts load notice:', err);
+            }
         };
         loadPosts();
+
+        const subscription = PostService.subscribeToPosts(() => {
+            loadPosts();
+        });
+
+        return () => {
+            isMounted = false;
+            if (subscription && typeof subscription.unsubscribe === 'function') {
+                subscription.unsubscribe();
+            }
+        };
     }, []);
 
     // Default center - will be overridden by MapBoundsController

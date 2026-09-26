@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Post } from '../types/categories';
+import { AuthService } from './AuthService';
 
 // ---------------------------------------------------------------------------
 // Helper: map a Supabase row to our Post type
@@ -31,7 +32,7 @@ export const PostService = {
         }
 
         try {
-            // Convert Base64 dataURL to Blob for fast, lightweight storage upload
+            // Convert Base64 dataURL to Blob for fast binary storage upload
             const parts = fileOrDataUrl.split(',');
             const mime = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
             const ext = mime.split('/')[1] || 'jpg';
@@ -43,7 +44,8 @@ export const PostService = {
             }
             const blob = new Blob([u8arr], { type: mime });
 
-            const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+            const cleanUserId = userId || 'anonymous';
+            const fileName = `${cleanUserId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
             const { data, error } = await supabase.storage
                 .from('khojsetu-images')
@@ -57,14 +59,13 @@ export const PostService = {
                     .from('khojsetu-images')
                     .getPublicUrl(fileName);
                 if (publicUrlData?.publicUrl) {
-                    console.log('Image uploaded to Supabase Storage:', publicUrlData.publicUrl);
                     return publicUrlData.publicUrl;
                 }
             } else if (error) {
-                console.warn('Storage bucket upload notice (using compressed fallback):', error.message);
+                console.warn('Storage upload fallback:', error.message);
             }
         } catch (uploadErr) {
-            console.warn('Upload error, using inline fallback:', uploadErr);
+            console.warn('Upload exception, using fallback:', uploadErr);
         }
 
         return fileOrDataUrl;
@@ -77,7 +78,7 @@ export const PostService = {
                 .from('posts')
                 .select(`*, profiles:user_id (name)`)
                 .order('created_at', { ascending: false })
-                .limit(50);
+                .limit(100);
 
             if (error) {
                 console.error('Error fetching posts:', error);
@@ -87,14 +88,32 @@ export const PostService = {
             return (data || []).map(mapRow);
         } catch (err: any) {
             console.error('getAllPosts failed:', err);
-            throw new Error(err?.message || 'Failed to load posts. Please try again.');
+            throw new Error(err?.message || 'Failed to load posts. Please check connection.');
         }
+    },
+
+    // ======================== REAL-TIME POSTS SUBSCRIPTION ========================
+    subscribeToPosts: (onPostsChange: () => void) => {
+        return supabase
+            .channel('public:posts')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'posts'
+                },
+                () => {
+                    onPostsChange();
+                }
+            )
+            .subscribe();
     },
 
     // ======================== CREATE POST ========================
     createPost: async (postData: Omit<Post, 'id' | 'timestamp'>): Promise<Post> => {
         try {
-            // 1. Resolve active user (from session or getUser)
+            // 1. Resolve active user
             const { data: sessionData } = await supabase.auth.getSession();
             let authUser = sessionData?.session?.user;
 
@@ -115,22 +134,10 @@ export const PostService = {
                 finalImageUrl = await PostService.uploadImage(finalImageUrl, realUserId);
             }
 
-            // 3. Ensure profile exists in profiles table
-            const profilePayload = {
-                id: realUserId,
-                email: authUser.email || postData.contactInfo || 'user@khojsetu.com',
-                name: postData.createdByName || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
-                avatar_url: authUser.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${realUserId}`,
-                updated_at: new Date().toISOString()
-            };
-
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .upsert(profilePayload, { onConflict: 'id' });
-
-            if (profileError) {
-                console.warn('Profile sync notice:', profileError.message);
-            }
+            // 3. Guarantee user profile exists in profiles table
+            await AuthService.ensureProfileExists(authUser, {
+                name: postData.createdByName
+            });
 
             // 4. Build standard post payload
             const normalizedType = (postData.type || 'lost').toLowerCase();

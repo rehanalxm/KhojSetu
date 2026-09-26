@@ -23,19 +23,60 @@ export const AuthService = {
      * Format a User object from Supabase session or profile data
      */
     _formatUser: (supaUser: any, profile?: any): User => {
-        const metadata = supaUser.user_metadata || {};
-        const email = supaUser.email || profile?.email || metadata.email || '';
+        const metadata = supaUser?.user_metadata || {};
+        const email = supaUser?.email || profile?.email || metadata.email || '';
+        const name = profile?.name || metadata.name || (email ? email.split('@')[0] : 'User');
+        const id = supaUser?.id || profile?.id || '';
+        const avatar =
+            profile?.avatar_url ||
+            metadata.avatar_url ||
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${id || email || 'user'}`;
+
         return {
-            id: supaUser.id,
-            email: email,
-            name: profile?.name || metadata.name || email.split('@')[0],
-            avatar:
-                profile?.avatar_url ||
-                metadata.avatar_url ||
-                `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-            isAdmin: profile?.is_admin === true || metadata.isAdmin === true,
-            joinedAt: new Date(supaUser.created_at)
+            id,
+            email,
+            name,
+            avatar,
+            isAdmin: profile?.is_admin === true || metadata.isAdmin === true || metadata.is_admin === true,
+            joinedAt: new Date(supaUser?.created_at || profile?.created_at || Date.now())
         };
+    },
+
+    /**
+     * Helper: Guarantee that a profile row exists in public.profiles for the given auth user
+     */
+    ensureProfileExists: async (authUser: any, customProfile?: Partial<{ name: string; avatar_url: string; gender: string }>): Promise<any> => {
+        if (!authUser?.id) return null;
+
+        const metadata = authUser.user_metadata || {};
+        const email = authUser.email || '';
+        const name = customProfile?.name || metadata.name || (email ? email.split('@')[0] : 'User');
+        const avatar_url = customProfile?.avatar_url || metadata.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${authUser.id}`;
+
+        const payload = {
+            id: authUser.id,
+            email,
+            name,
+            avatar_url,
+            gender: customProfile?.gender || metadata.gender || 'male',
+            updated_at: new Date().toISOString()
+        };
+
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .upsert(payload, { onConflict: 'id' })
+                .select('*')
+                .single();
+
+            if (!error && data) {
+                return data;
+            }
+        } catch (err) {
+            console.warn('Profile ensure notice:', err);
+        }
+
+        return payload;
     },
 
     // ======================== SIGNUP WITH OTP ========================
@@ -45,7 +86,6 @@ export const AuthService = {
         password: string,
         gender: 'male' | 'female'
     ): Promise<void> => {
-        // Persist pending data for later verification
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_PASSWORD, password);
         localStorage.setItem(OTP_STORAGE_KEYS.PENDING_NAME, name);
@@ -57,7 +97,6 @@ export const AuthService = {
                 options: { shouldCreateUser: false }
             });
             if (error) throw error;
-            console.log('OTP sent to', email);
         } catch (err: any) {
             console.error('signupInitiate failed:', err);
             throw new Error(err?.message || 'Failed to send OTP. Please try again.');
@@ -66,10 +105,8 @@ export const AuthService = {
 
     verifyOtpAndSignup: async (email: string, token: string): Promise<User> => {
         const name = localStorage.getItem(OTP_STORAGE_KEYS.PENDING_NAME) || 'User';
-        const gender = (localStorage.getItem(OTP_STORAGE_KEYS.PENDING_GENDER) || 'male') as
-            | 'male'
-            | 'female';
-        const avatarUrl = `https://api.dicebear.com/7.x/personas/svg?seed=${name}`;
+        const gender = (localStorage.getItem(OTP_STORAGE_KEYS.PENDING_GENDER) || 'male') as 'male' | 'female';
+        const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
 
         try {
             const { data, error } = await supabase.auth.verifyOtp({
@@ -81,21 +118,13 @@ export const AuthService = {
             if (error) throw error;
             if (!data.user) throw new Error('OTP verification failed');
 
-            // Create / update profile
-            const { error: profileError } = await supabase.from('profiles').upsert(
-                {
-                    id: data.user.id,
-                    email,
-                    name,
-                    avatar_url: avatarUrl,
-                    gender,
-                    updated_at: new Date().toISOString()
-                },
-                { onConflict: 'id' }
-            );
-            if (profileError) console.warn('Profile upsert warning:', profileError.message);
+            const profile = await AuthService.ensureProfileExists(data.user, {
+                name,
+                avatar_url: avatarUrl,
+                gender
+            });
 
-            const newUser = AuthService._formatUser(data.user, { name, avatar_url: avatarUrl });
+            const newUser = AuthService._formatUser(data.user, profile);
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
             clearPendingOtp();
             return newUser;
@@ -108,36 +137,42 @@ export const AuthService = {
     // ======================== LOGIN ========================
     login: async (email: string, password: string): Promise<User> => {
         try {
-            console.log('AuthService.login: Calling signInWithPassword...');
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-            console.log('AuthService.login: signInWithPassword returned', { hasData: !!data?.user, hasError: !!error });
 
             if (error) {
-                console.error('AuthService.login: DB returned error:', error);
+                console.error('AuthService.login error:', error);
                 throw error;
             }
             if (!data.user) throw new Error('Login succeeded but no user returned.');
 
-            return {
-                id: data.user.id,
-                email: data.user.email!,
-                name: 'Loading...',
-                joinedAt: new Date()
-            };
+            // Fetch or ensure profile immediately
+            let { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', data.user.id)
+                .single();
+
+            if (!profile) {
+                profile = await AuthService.ensureProfileExists(data.user);
+            }
+
+            const formattedUser = AuthService._formatUser(data.user, profile);
+            localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(formattedUser));
+            return formattedUser;
         } catch (err: any) {
             console.error('Login failed:', err);
             throw new Error(err?.message || 'Login failed. Please check your credentials.');
         }
     },
 
-    // ======================== DIRECT SIGNUP (no OTP) ========================
+    // ======================== DIRECT SIGNUP ========================
     signup: async (
         name: string,
         email: string,
         password: string,
         gender: 'male' | 'female'
     ): Promise<User> => {
-        const avatarUrl = `https://api.dicebear.com/7.x/personas/svg?seed=${name}`;
+        const avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(name)}`;
 
         try {
             const { data, error } = await supabase.auth.signUp({
@@ -148,69 +183,18 @@ export const AuthService = {
             if (error) throw error;
             if (!data.user) throw new Error('Signup failed');
 
-            const { error: profileError } = await supabase.from('profiles').upsert(
-                {
-                    id: data.user.id,
-                    email,
-                    name,
-                    avatar_url: avatarUrl,
-                    gender,
-                    updated_at: new Date().toISOString()
-                },
-                { onConflict: 'id' }
-            );
-            if (profileError) console.warn('Profile creation warning:', profileError.message);
+            const profile = await AuthService.ensureProfileExists(data.user, {
+                name,
+                avatar_url: avatarUrl,
+                gender
+            });
 
-            const newUser = AuthService._formatUser(data.user, { name, avatar_url: avatarUrl });
+            const newUser = AuthService._formatUser(data.user, profile);
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
             return newUser;
         } catch (err: any) {
             console.error('Signup failed:', err);
             throw new Error(err?.message || 'Signup failed. Please try again.');
-        }
-    },
-
-    // ======================== PASSWORD RESET ========================
-    forgotPasswordInitiate: async (email: string): Promise<void> => {
-        localStorage.setItem(OTP_STORAGE_KEYS.PENDING_EMAIL, email);
-
-        try {
-            const { error } = await supabase.auth.signInWithOtp({
-                email,
-                options: { shouldCreateUser: false }
-            });
-            if (error) throw error;
-        } catch (err: any) {
-            console.error('forgotPasswordInitiate failed:', err);
-            throw new Error(err?.message || 'Failed to send reset OTP.');
-        }
-    },
-
-    verifyOtpForPasswordReset: async (email: string, token: string): Promise<string> => {
-        try {
-            const { data, error } = await supabase.auth.verifyOtp({
-                email,
-                token,
-                type: 'email'
-            });
-            if (error) throw error;
-            if (!data.session) throw new Error('Session creation failed');
-            localStorage.setItem(OTP_STORAGE_KEYS.OTP_SESSION, data.session.access_token);
-            return data.session.access_token;
-        } catch (err: any) {
-            console.error('verifyOtpForPasswordReset failed:', err);
-            throw new Error(err?.message || 'OTP verification failed.');
-        }
-    },
-
-    completePasswordReset: async (newPassword: string): Promise<void> => {
-        try {
-            const { error } = await supabase.auth.updateUser({ password: newPassword });
-            if (error) throw error;
-            clearPendingOtp();
-        } catch (err: any) {
-            console.error('completePasswordReset failed:', err);
-            throw new Error(err?.message || 'Password reset failed.');
         }
     },
 
@@ -221,19 +205,12 @@ export const AuthService = {
         } catch (err) {
             console.warn('Logout warning:', err);
         }
-        localStorage.removeItem(STORAGE_KEYS.USER);
-    },
-
-    async forgotPassword(email: string) {
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin
-            });
-            if (error) throw error;
-        } catch (err: any) {
-            console.error('forgotPassword failed:', err);
-            throw new Error(err?.message || 'Failed to send password reset email.');
-        }
+        // Purge all KhojSetu user storage
+        Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith('khojsetu_')) {
+                localStorage.removeItem(key);
+            }
+        });
     },
 
     async syncSession(providedSession?: any): Promise<User | null> {
@@ -249,7 +226,7 @@ export const AuthService = {
                 session = data.session;
             }
 
-            if (!session) {
+            if (!session?.user) {
                 localStorage.removeItem(STORAGE_KEYS.USER);
                 return null;
             }
@@ -264,98 +241,68 @@ export const AuthService = {
             localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
             return user;
         } catch (err) {
-            console.error('syncSession failed:', err);
-            localStorage.removeItem(STORAGE_KEYS.USER);
+            console.error('syncSession error:', err);
+            return AuthService.getCurrentUser();
+        }
+    },
+
+    getCurrentUser: (): User | null => {
+        const stored = localStorage.getItem(STORAGE_KEYS.USER);
+        if (!stored) return null;
+        try {
+            return JSON.parse(stored);
+        } catch {
             return null;
         }
     },
 
-    async verifyOtp(email: string, token: string) {
+    // ======================== PASSWORD RECOVERY ========================
+    forgotPassword: async (email: string): Promise<void> => {
         try {
-            const { data, error } = await supabase.auth.verifyOtp({
-                email,
-                token,
-                type: 'recovery'
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin
             });
             if (error) throw error;
-            return data;
         } catch (err: any) {
-            console.error('verifyOtp failed:', err);
-            throw new Error(err?.message || 'OTP verification failed.');
+            console.error('forgotPassword failed:', err);
+            throw new Error(err?.message || 'Failed to send password reset email.');
         }
     },
 
-    async resetPassword(password: string) {
+    resetPassword: async (newPassword: string): Promise<void> => {
         try {
-            const { error } = await supabase.auth.updateUser({ password });
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
             if (error) throw error;
         } catch (err: any) {
             console.error('resetPassword failed:', err);
-            throw new Error(err?.message || 'Password reset failed.');
+            throw new Error(err?.message || 'Password update failed.');
         }
     },
 
-    // ======================== ACCOUNT DELETION ========================
+    // ======================== DELETE ACCOUNT ========================
     deleteAccount: async (userId: string): Promise<void> => {
-        console.log('Starting account deletion for:', userId);
-
-        // Delete related data (non-blocking, best-effort)
         try {
-            await supabase
-                .from('chats')
-                .delete()
-                .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-        } catch (e) {
-            console.warn('Non-critical: chats deletion error:', e);
-        }
-
-        try {
+            await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
             await supabase.from('posts').delete().eq('user_id', userId);
-        } catch (e) {
-            console.warn('Non-critical: posts deletion error:', e);
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            if (error) throw error;
+            await AuthService.logout();
+        } catch (err: any) {
+            console.error('deleteAccount failed:', err);
+            throw new Error(err?.message || 'Failed to delete account.');
         }
-
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', userId);
-
-        if (profileError) {
-            throw new Error(`Profile deletion failed: ${profileError.message}`);
-        }
-
-        await AuthService.logout();
     },
 
-    // ======================== ADMIN DELETE PROFILE ========================
+    // ======================== ADMIN PROFILE DELETION ========================
     adminDeleteProfile: async (userId: string): Promise<void> => {
-        console.log('Admin deleting account for:', userId);
-
-        // Best effort related data deletion
         try {
-            await supabase.from('chats').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+            await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
             await supabase.from('posts').delete().eq('user_id', userId);
-        } catch (e) {
-            console.warn('Non-critical: cascade deletion error:', e);
+            const { error } = await supabase.from('profiles').delete().eq('id', userId);
+            if (error) throw error;
+        } catch (err: any) {
+            console.error('adminDeleteProfile failed:', err);
+            throw new Error(err?.message || 'Failed to delete profile.');
         }
-
-        const { error } = await supabase.from('profiles').delete().eq('id', userId);
-        if (error) {
-            throw new Error(`Profile deletion failed: ${error.message}`);
-        }
-    },
-
-    // ======================== LOCAL STATE ========================
-    getCurrentUser: (): User | null => {
-        const stored = localStorage.getItem(STORAGE_KEYS.USER);
-        if (stored) {
-            try {
-                const u = JSON.parse(stored);
-                return { ...u, joinedAt: new Date(u.joinedAt) };
-            } catch {
-                return null;
-            }
-        }
-        return null;
     }
 };

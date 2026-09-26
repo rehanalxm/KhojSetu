@@ -32,8 +32,8 @@ export default function FeedView({
     const [error, setError] = useState<string | null>(null);
     const isMounted = useRef(true);
 
-    const loadPosts = async () => {
-        setLoading(true);
+    const loadPosts = async (showSpinner = false) => {
+        if (showSpinner) setLoading(true);
         setError(null);
         try {
             const data = await PostService.getAllPosts();
@@ -41,9 +41,7 @@ export default function FeedView({
                 setPosts(data);
             }
         } catch (error: any) {
-            // Ignore AbortError — this happens in React StrictMode during dev
             if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
-                console.log('Fetch aborted (StrictMode re-mount), ignoring.');
                 return;
             }
             console.error('Failed to load posts', error);
@@ -52,7 +50,7 @@ export default function FeedView({
                 onShowToast('Failed to load content. Check connection.', 'error');
             }
         } finally {
-            if (isMounted.current) {
+            if (isMounted.current && showSpinner) {
                 setLoading(false);
             }
         }
@@ -60,9 +58,18 @@ export default function FeedView({
 
     useEffect(() => {
         isMounted.current = true;
-        loadPosts();
+        loadPosts(true);
+
+        // Subscribe to real-time post changes across all users
+        const subscription = PostService.subscribeToPosts(() => {
+            loadPosts(false);
+        });
+
         return () => {
             isMounted.current = false;
+            if (subscription && typeof subscription.unsubscribe === 'function') {
+                subscription.unsubscribe();
+            }
         };
     }, []);
 
@@ -106,7 +113,7 @@ export default function FeedView({
                         <h3 className="text-xl font-bold text-white mb-2">Connection Error</h3>
                         <p className="text-red-400 mb-6 max-w-md mx-auto">{error}</p>
                         <button
-                            onClick={loadPosts}
+                            onClick={() => loadPosts(true)}
                             className="px-6 py-2 bg-primary text-white rounded-full hover:bg-opacity-90 transition-all font-medium"
                         >
                             Try Again
