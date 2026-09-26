@@ -110,8 +110,8 @@ export default function FeedView({
                 ) : error ? (
                     <div className="text-center py-20">
                         <div className="text-6xl mb-4">⚠️</div>
-                        <h3 className="text-xl font-bold text-white mb-2">Connection Error</h3>
-                        <p className="text-red-400 mb-6 max-w-md mx-auto">{error}</p>
+                        <h3 className="text-xl font-bold text-text mb-2">Connection Error</h3>
+                        <p className="text-red-500 dark:text-red-400 mb-6 max-w-md mx-auto">{error}</p>
                         <button
                             onClick={() => loadPosts(true)}
                             className="px-6 py-2 bg-primary text-white rounded-full hover:bg-opacity-90 transition-all font-medium"
@@ -122,8 +122,8 @@ export default function FeedView({
                 ) : filteredPosts.length === 0 ? (
                     <div className="text-center py-20">
                         <div className="text-6xl mb-4">🔍</div>
-                        <h3 className="text-xl font-bold text-white mb-2">No posts found</h3>
-                        <p className="text-gray-400">
+                        <h3 className="text-xl font-bold text-text mb-2">No posts found</h3>
+                        <p className="text-muted max-w-md mx-auto">
                             {posts.length === 0
                                 ? 'No items have been posted yet. Be the first to report a lost or found item!'
                                 : 'Try adjusting your search or filters'}
@@ -131,7 +131,7 @@ export default function FeedView({
                     </div>
                 ) : (
                     <>
-                        <div className="mb-4 text-sm text-gray-400">
+                        <div className="mb-4 text-sm text-muted">
                             Showing {filteredPosts.length} {filteredPosts.length === 1 ? 'post' : 'posts'}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

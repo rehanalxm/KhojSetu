@@ -1,11 +1,11 @@
-import { Github, Linkedin, Twitter, Heart, MapPin, Globe, Shield, HelpCircle, Compass } from 'lucide-react';
+import { Github, Linkedin, Twitter, Heart, MapPin, Globe, Shield, HelpCircle, Compass, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface FooterProps {
     onOpenAdmin?: () => void;
 }
 
-export default function Footer({ onOpenAdmin }: FooterProps) {
+export default function Footer({ }: FooterProps) {
     const currentYear = new Date().getFullYear();
 
     const handleHomeClick = () => {
@@ -126,9 +126,11 @@ export default function Footer({ onOpenAdmin }: FooterProps) {
                         <a href="#" className="hover:text-primary transition-colors">Guidelines</a>
                     </div>
 
-                    <button
-                        onClick={onOpenAdmin}
-                        className="group relative px-8 py-3 bg-surface hover:bg-surface/80 border border-border rounded-2xl transition-all duration-500 flex items-center gap-3 active:scale-95 cursor-pointer"
+                    <a
+                        href="https://techiedox.vercel.app"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group relative px-8 py-3 bg-surface hover:bg-surface/80 border border-border rounded-2xl transition-all duration-500 flex items-center gap-3 active:scale-95 cursor-pointer no-underline"
                     >
                         <div className="flex items-center gap-2.5 text-[13px] font-bold text-muted group-hover:text-text transition-colors">
                             <span>Designed & Developed with</span>
@@ -144,8 +146,8 @@ export default function Footer({ onOpenAdmin }: FooterProps) {
                         <span className="text-[14px] font-black bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent group-hover:tracking-wider transition-all duration-500 uppercase">
                             Team Dox
                         </span>
-                        <Shield className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-                    </button>
+                        <ExternalLink className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
+                    </a>
                 </div>
             </div>
 

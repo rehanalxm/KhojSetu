@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, Grid3x3, Map as MapIcon, User as UserIcon, LogOut, Archive } from 'lucide-react';
+import { Plus, MessageSquare, Grid3x3, Map as MapIcon, User as UserIcon, LogOut, Archive, Shield } from 'lucide-react';
 import LiveMap from './components/LiveMap';
 import FeedView from './components/FeedView';
 import PostItemForm from './components/PostItemForm';
@@ -331,17 +331,7 @@ function App() {
                 onShowToast={showToast}
               />
               {/* Footer Integrated here */}
-              <Footer onOpenAdmin={() => {
-                console.log("Admin Panel Attempt:", { user, isAdmin: user?.isAdmin });
-                if (user?.isAdmin) {
-                  setIsAdminPanelOpen(true);
-                } else if (!user) {
-                  showToast("Please login first.", "error");
-                  setIsAuthModalOpen(true);
-                } else {
-                  showToast("Admin access required for " + user.email, "error");
-                }
-              }} />
+              <Footer />
             </motion.div>
           ) : (
             <motion.div
@@ -366,7 +356,7 @@ function App() {
                   }
                   setChatTarget({
                     id: post.userId,
-                    name: post.createdByName || post.contactInfo || `User ${post.userId}`,
+                    name: post.createdByName || (post.contactInfo?.includes('@') ? post.contactInfo.split('@')[0] : post.contactInfo) || 'User',
                     postId: post.id,
                     postTitle: post.title,
                     postType: post.type,
@@ -517,6 +507,21 @@ function App() {
                   </div>
                 </button>
 
+                {user?.isAdmin && (
+                  <button
+                    onClick={() => { setIsAdminPanelOpen(true); setShowProfileMenu(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition group"
+                  >
+                    <div className="p-2 rounded-lg bg-red-500/10 text-red-500 group-hover:bg-red-500 group-hover:text-white transition">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <span className="block font-semibold text-text">Admin Panel</span>
+                      <span className="text-xs text-muted">Manage posts & users</span>
+                    </div>
+                  </button>
+                )}
+
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-500/10 transition group"
@@ -628,7 +633,7 @@ function App() {
               }
               setChatTarget({
                 id: post.userId,
-                name: post.createdByName || `User ${String(post.userId).slice(0, 5)}`,
+                name: post.createdByName || (post.contactInfo?.includes('@') ? post.contactInfo.split('@')[0] : post.contactInfo) || 'User',
                 postId: post.id,
                 postTitle: post.title,
                 postType: post.type,
@@ -657,7 +662,7 @@ function App() {
               }
               setChatTarget({
                 id: post.userId,
-                name: post.createdByName || `User ${String(post.userId).slice(0, 5)}`,
+                name: post.createdByName || (post.contactInfo?.includes('@') ? post.contactInfo.split('@')[0] : post.contactInfo) || 'User',
                 postId: post.id,
                 postTitle: post.title,
                 postType: post.type,

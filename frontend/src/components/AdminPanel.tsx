@@ -19,7 +19,7 @@ export default function AdminPanel({ onClose, onShowToast, onShowConfirm, curren
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const [users, setUsers] = useState<{ id: string, name: string }[]>([]);
+    const [users, setUsers] = useState<{ id: string, name: string, email?: string }[]>([]);
 
     useEffect(() => {
         if (!currentUser?.isAdmin) {
@@ -166,7 +166,7 @@ export default function AdminPanel({ onClose, onShowToast, onShowConfirm, curren
                                                 <span className={`px-1.5 py-0.5 rounded border ${post.type?.toUpperCase() === 'LOST' ? 'border-red-500/30 text-red-400 bg-red-500/10' : 'border-green-500/30 text-green-400 bg-green-500/10'}`}>
                                                     {post.type?.toUpperCase()}
                                                 </span>
-                                                <span className="text-muted">By: {post.createdByName || post.userId.substring(0, 8)}</span>
+                                                <span className="text-muted">By: {post.createdByName || (post.contactInfo?.includes('@') ? post.contactInfo.split('@')[0] : post.contactInfo) || 'Community Member'}</span>
                                                 <span className="text-muted">{getTimeAgo(post.timestamp)}</span>
                                             </div>
                                         </div>
@@ -185,37 +185,40 @@ export default function AdminPanel({ onClose, onShowToast, onShowConfirm, curren
                         <div className="space-y-3">
                             {users.length === 0 && <div className="text-center text-muted py-8">No users found.</div>}
                             <AnimatePresence>
-                                {users.map(u => (
-                                    <motion.div
-                                        key={u.id}
-                                        layout
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        className="bg-surface border border-border rounded-xl p-3 flex justify-between items-center"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5">
-                                                <img
-                                                    src={`https://api.dicebear.com/7.x/personas/svg?seed=${u.name || u.id}`}
-                                                    className="w-full h-full rounded-full bg-black"
-                                                />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-bold text-text text-sm">{u.name || 'Unknown User'}</h3>
-                                                <p className="text-[10px] text-muted font-mono">{u.id}</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => handleDeleteUser(u.id, u.name)}
-                                            className="px-3 py-1.5 bg-red-500/10 text-red-500 text-xs font-bold rounded-lg hover:bg-red-500 hover:text-white transition flex items-center gap-1"
-                                            title="Delete User and all related data"
+                                {users.map(u => {
+                                    const displayName = u.name || (u.email ? u.email.split('@')[0] : 'Community User');
+                                    return (
+                                        <motion.div
+                                            key={u.id}
+                                            layout
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="bg-surface border border-border rounded-xl p-3 flex justify-between items-center"
                                         >
-                                            <Trash2 className="w-3 h-3" />
-                                            Remove User
-                                        </button>
-                                    </motion.div>
-                                ))}
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-secondary p-0.5 flex-shrink-0">
+                                                    <img
+                                                        src={`https://api.dicebear.com/7.x/personas/svg?seed=${displayName}`}
+                                                        className="w-full h-full rounded-full bg-black object-cover"
+                                                    />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h3 className="font-bold text-text text-sm truncate">{displayName}</h3>
+                                                    <p className="text-xs text-muted truncate">{u.email || u.id}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteUser(u.id, displayName)}
+                                                className="px-3 py-1.5 bg-red-500/10 text-red-500 text-xs font-bold rounded-lg hover:bg-red-500 hover:text-white transition flex items-center gap-1 flex-shrink-0"
+                                                title="Delete User and all related data"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                Remove User
+                                            </button>
+                                        </motion.div>
+                                    );
+                                })}
                             </AnimatePresence>
                         </div>
                     )}

@@ -421,9 +421,11 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
 
                     <button
                         onClick={onClose}
-                        className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition"
+                        aria-label="Close Chat"
+                        title="Close Chat"
+                        className="p-2 bg-black/5 dark:bg-white/10 hover:bg-red-500/20 text-muted hover:text-red-500 rounded-full transition flex items-center justify-center active:scale-95"
                     >
-                        <X className="w-5 h-5 text-muted hover:text-text" />
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
             </div>
@@ -431,7 +433,7 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
             {/* Content */}
             <div className="flex-1 overflow-y-auto bg-surface/30 scrollbar-thin scrollbar-thumb-muted/30 scrollbar-track-transparent">
                 {loading && conversations.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-gray-400 gap-2">
+                    <div className="flex items-center justify-center h-full text-muted gap-2">
                         <Loader2 className="w-5 h-5 animate-spin" />
                         <span>Loading chats...</span>
                     </div>
@@ -440,11 +442,11 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                     <div className="p-2 space-y-1">
                         {conversations.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                                <div className="p-4 bg-white/5 rounded-full mb-3">
-                                    <MessageCircle className="w-8 h-8 text-gray-500" />
+                                <div className="p-4 bg-black/5 dark:bg-white/5 rounded-full mb-3">
+                                    <MessageCircle className="w-8 h-8 text-muted" />
                                 </div>
-                                <p className="text-sm text-gray-400">No conversations yet</p>
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-sm font-bold text-text">No conversations yet</p>
+                                <p className="text-xs text-muted mt-1">
                                     Contact someone on a post to start chatting!
                                 </p>
                             </div>
@@ -467,7 +469,7 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                                             <h4 className="font-semibold text-sm text-text truncate">
                                                 {conv.participantName}
                                             </h4>
-                                            <span className="text-[10px] text-gray-500 flex-shrink-0 ml-2">
+                                            <span className="text-[10px] text-muted flex-shrink-0 ml-2">
                                                 {conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleDateString() : 'New'}
                                             </span>
                                         </div>
@@ -491,14 +493,14 @@ export default function ChatInterface({ onClose, initialContact, onShowConfirm, 
                     // Messages View
                     <div className="p-4 flex flex-col h-full">
                         {messagesLoading ? (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2">
+                            <div className="flex flex-col items-center justify-center h-full text-muted gap-2">
                                 <Loader2 className="w-5 h-5 animate-spin" />
                                 <span>Loading messages...</span>
                             </div>
                         ) : messages.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-center">
-                                <p className="text-sm text-gray-400">No messages yet</p>
-                                <p className="text-xs text-gray-500 mt-1">Say Hello! 👋</p>
+                                <p className="text-sm font-bold text-text">No messages yet</p>
+                                <p className="text-xs text-muted mt-1">Say Hello! 👋</p>
                             </div>
                         ) : (
                             <>
