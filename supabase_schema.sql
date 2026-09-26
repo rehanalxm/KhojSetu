@@ -245,7 +245,32 @@ CREATE POLICY "Authenticated users can upload item images"
     ON storage.objects FOR INSERT 
     WITH CHECK (bucket_id = 'khojsetu-images' AND auth.role() = 'authenticated');
 
+
+-- ----------------------------------------------------------------------------
+-- 7. SECURE ACCOUNT DELETION FUNCTION (RPC)
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.delete_user_account()
+RETURNS void AS $$
+DECLARE
+    current_uid UUID;
+BEGIN
+    current_uid := auth.uid();
+    IF current_uid IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    -- Delete user data (Cascades to posts, messages, claims, notifications)
+    DELETE FROM public.profiles WHERE id = current_uid;
+    -- Delete from auth.users (Permanent deletion)
+    DELETE FROM auth.users WHERE id = current_uid;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execution to authenticated users
+GRANT EXECUTE ON FUNCTION public.delete_user_account() TO authenticated;
+
 -- ============================================================================
 -- End of Schema
 -- ============================================================================
+
 

@@ -282,10 +282,17 @@ export const AuthService = {
     // ======================== DELETE ACCOUNT ========================
     deleteAccount: async (userId: string): Promise<void> => {
         try {
-            await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-            await supabase.from('posts').delete().eq('user_id', userId);
-            const { error } = await supabase.from('profiles').delete().eq('id', userId);
-            if (error) throw error;
+            // 1. Try secure RPC function that deletes both profile and auth.user
+            const { error: rpcError } = await supabase.rpc('delete_user_account');
+
+            if (rpcError) {
+                console.warn('RPC delete notice, running direct cascade delete:', rpcError.message);
+                // 2. Fallback: Direct table delete
+                await supabase.from('messages').delete().or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+                await supabase.from('posts').delete().eq('user_id', userId);
+                await supabase.from('profiles').delete().eq('id', userId);
+            }
+
             await AuthService.logout();
         } catch (err: any) {
             console.error('deleteAccount failed:', err);

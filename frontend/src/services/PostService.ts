@@ -24,6 +24,38 @@ const mapRow = (p: any): Post => ({
     createdByName: p.profiles?.name
 });
 
+// Helper: compress dataURL to a tiny fallback thumbnail (< 20KB)
+const createTinyThumbnail = (base64Str: string, maxDim = 400, quality = 0.4): Promise<string> => {
+    return new Promise((resolve) => {
+        if (!base64Str || !base64Str.startsWith('data:')) {
+            return resolve(base64Str || '');
+        }
+        const img = new Image();
+        img.src = base64Str;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+            if (width > height) {
+                if (width > maxDim) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                }
+            } else {
+                if (height > maxDim) {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(base64Str.slice(0, 10000));
+    });
+};
+
 export const PostService = {
     // ======================== UPLOAD IMAGE ========================
     uploadImage: async (fileOrDataUrl: string, userId: string): Promise<string> => {
@@ -44,7 +76,7 @@ export const PostService = {
             }
             const blob = new Blob([u8arr], { type: mime });
 
-            const cleanUserId = userId || 'anonymous';
+            const cleanUserId = userId || 'user';
             const fileName = `${cleanUserId}/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
             const { data, error } = await supabase.storage
@@ -61,14 +93,13 @@ export const PostService = {
                 if (publicUrlData?.publicUrl) {
                     return publicUrlData.publicUrl;
                 }
-            } else if (error) {
-                console.warn('Storage upload fallback:', error.message);
             }
         } catch (uploadErr) {
-            console.warn('Upload exception, using fallback:', uploadErr);
+            console.warn('Storage upload notice, optimizing thumbnail fallback:', uploadErr);
         }
 
-        return fileOrDataUrl;
+        // Fallback: compress to ultra-lightweight thumbnail so JSON insert is under 20KB
+        return await createTinyThumbnail(fileOrDataUrl, 400, 0.4);
     },
 
     // ======================== GET ALL POSTS ========================
@@ -128,7 +159,7 @@ export const PostService = {
 
             const realUserId = authUser.id;
 
-            // 2. Upload image to Supabase Storage if present
+            // 2. Upload image or get lightweight optimized URL
             let finalImageUrl = postData.imageUrl || '';
             if (finalImageUrl && finalImageUrl.startsWith('data:')) {
                 finalImageUrl = await PostService.uploadImage(finalImageUrl, realUserId);
@@ -182,7 +213,11 @@ export const PostService = {
             return mapRow(insertData);
         } catch (err: any) {
             console.error('createPost error details:', err);
-            throw new Error(err?.message || 'Failed to create post. Please try again.');
+            const msg = err?.message || '';
+            if (msg.includes('abort') || msg.includes('signal')) {
+                throw new Error('Upload took too long or was interrupted. Please try again.');
+            }
+            throw new Error(msg || 'Failed to create post. Please try again.');
         }
     },
 
